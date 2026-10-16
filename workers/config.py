@@ -16,3 +16,7 @@ BLENDER_THREADS = int(os.environ.get("BLENDER_THREADS", 4))
 BLENDER_TIMEOUT_S = int(os.environ.get("BLENDER_TIMEOUT_S", 60 * 60))
 FFMPEG_THREADS = int(os.environ.get("FFMPEG_THREADS", 4))
 FFMPEG_TIMEOUT_S = int(os.environ.get("FFMPEG_TIMEOUT_S", 10 * 60))
+
+# Font for contact-sheet frame labels. drawtext needs an explicit font file: without one,
+# this FFmpeg build fails to load a Fontconfig config and crashes. Missing file = no labels.
+FFMPEG_FONTFILE = os.environ.get("FFMPEG_FONTFILE", "C:/Windows/Fonts/consola.ttf")
