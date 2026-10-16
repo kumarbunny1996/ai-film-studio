@@ -182,3 +182,93 @@ def test_json_schema_describes_both_versions():
     assert rule["if"]["properties"]["spec_version"]["const"] == "1.0"
     assert rule["then"]["properties"]["primitives"]["maxItems"] == 0
     assert "Primitive" in schema["$defs"] and "primitives" in schema["properties"]
+
+
+# ---------------------------------------------------------------------------
+# Finite numbers everywhere (M1): NaN/+-inf must never reach Blender
+# ---------------------------------------------------------------------------
+NON_FINITE = [float("nan"), float("inf"), float("-inf")]
+EXAMPLES = {name: json.loads((ROOT / f"schemas/examples/{name}.json").read_text())
+            for name in ("scene_001", "milestone1_primitives", "m3_framing")}
+
+
+def numeric_paths(obj, path=()):
+    """Every int/float leaf in a spec (bools excluded)."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            yield from numeric_paths(v, path + (k,))
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from numeric_paths(v, path + (i,))
+    elif isinstance(obj, (int, float)) and not isinstance(obj, bool):
+        yield path
+
+
+def with_value(raw: dict, path: tuple, value) -> dict:
+    d = copy.deepcopy(raw)
+    node = d
+    for p in path[:-1]:
+        node = node[p]
+    node[path[-1]] = value
+    return d
+
+
+@pytest.mark.parametrize("name", list(EXAMPLES))
+def test_every_number_in_every_example_must_be_finite(name):
+    """Exhaustive: each numeric field of each committed example, set to NaN, inf and -inf,
+    is rejected (before the fix, 246 of these were accepted)."""
+    raw = EXAMPLES[name]
+    paths = list(numeric_paths(raw))
+    assert paths, name
+    accepted = []
+    for path in paths:
+        for bad in NON_FINITE:
+            try:
+                SceneSpec.model_validate(with_value(raw, path, bad))
+                accepted.append((".".join(map(str, path)), bad))
+            except ValidationError:
+                pass
+    assert accepted == []
+
+
+@pytest.mark.parametrize("bad", NON_FINITE, ids=["nan", "inf", "-inf"])
+@pytest.mark.parametrize("name, path", [
+    ("milestone1_primitives", ("primitives", 1, "transform", "location", 0)),
+    ("milestone1_primitives", ("primitives", 2, "keys", 0, "location", 1)),
+    ("milestone1_primitives", ("primitives", 2, "keys", 0, "rotation_deg", 2)),
+    ("scene_001", ("characters", 0, "transform", "location", 2)),
+    ("scene_001", ("characters", 0, "transform", "rotation_deg", 0)),
+    ("scene_001", ("characters", 0, "motion_path", 0, "location", 0)),
+    ("scene_001", ("characters", 0, "motion_path", 0, "rotation_z_deg")),
+    ("scene_001", ("environment", "hdri_rotation_deg")),
+], ids=["prim-transform", "prim-key-location", "prim-key-rotation", "char-transform-location",
+        "char-transform-rotation", "motion-path-location", "motion-path-heading", "hdri-rotation"])
+def test_previously_accepted_unbounded_fields_now_reject_non_finite(name, path, bad):
+    with pytest.raises(ValidationError, match="finite number"):
+        SceneSpec.model_validate(with_value(EXAMPLES[name], path, bad))
+
+
+def test_non_finite_json_literals_are_rejected_outside_the_camera():
+    text = json.dumps(EXAMPLES["milestone1_primitives"]).replace(
+        '"location": [0, 0, 0.5]', '"location": [NaN, 0, 0.5]', 1)
+    assert "NaN" in text
+    with pytest.raises(ValidationError):
+        SceneSpec.model_validate_json(text)
+    with pytest.raises(ValidationError, match="finite number"):
+        SceneSpec.model_validate(json.loads(text))
+
+
+def test_finite_check_applies_to_every_model():
+    import inspect
+    from apps.api.schemas import scene_spec as S
+    models = [o for o in vars(S).values() if inspect.isclass(o) and issubclass(o, S.Strict)]
+    assert len(models) > 10
+    assert all(m.model_config.get("allow_inf_nan") is False for m in models)
+    assert all(m.model_config.get("extra") == "forbid" for m in models)
+
+
+@pytest.mark.parametrize("name", list(EXAMPLES))
+def test_valid_examples_are_unchanged_by_the_finite_check(name):
+    raw = EXAMPLES[name]
+    once = SceneSpec.model_validate(raw).model_dump_json()
+    assert SceneSpec.model_validate_json(once).model_dump_json() == once

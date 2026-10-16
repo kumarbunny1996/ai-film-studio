@@ -17,7 +17,7 @@ Versions:
        `look_at`, and depth of field with nothing to focus on, are errors; 1.0/1.1 keep
        accepting them (see camera_warnings()). Every valid 1.1 spec is still valid as 1.1.
 
-All versions: camera numbers must be finite (NaN and +/-inf are rejected).
+All versions: every number must be finite (NaN and +/-inf are rejected; see Strict).
 """
 from __future__ import annotations
 
@@ -39,8 +39,9 @@ RGB = Annotated[list[Annotated[float, Field(ge=0, le=1)]], Field(min_length=3, m
 
 
 class Strict(BaseModel):
-    """Reject unknown keys so LLM hallucinated fields fail loudly."""
-    model_config = ConfigDict(extra="forbid", frozen=False)
+    """Reject unknown keys so LLM hallucinated fields fail loudly, and reject NaN/+-inf in
+    every number so a non-finite value can never reach Blender."""
+    model_config = ConfigDict(extra="forbid", frozen=False, allow_inf_nan=False)
 
 
 class Easing(str, Enum):
@@ -231,8 +232,6 @@ class ShotSize(str, Enum):
 
 
 class CameraKey(Strict):
-    model_config = ConfigDict(allow_inf_nan=False)   # all versions: finite numbers only
-
     frame: Frame
     location: Vec3
     rotation_deg: Vec3 | None = None           # ignored when camera.look_at is set (1.0/1.1)
@@ -247,8 +246,6 @@ SubjectOffset = Annotated[list[Annotated[float, Field(ge=-0.4, le=0.4)]],
 class Framing(Strict):
     """v1.2. Where the look_at aim point sits in frame, as a fraction of the frame from its
     centre: [x, y], +x right, +y up. [-1/6, 0] puts it on the left third line."""
-    model_config = ConfigDict(allow_inf_nan=False)
-
     subject_offset: SubjectOffset
 
 
@@ -258,8 +255,6 @@ V12_CAMERA_FIELDS = ("framing", "clip_start_m", "clip_end_m", "focus_distance_m"
 
 
 class Camera(Strict):
-    model_config = ConfigDict(allow_inf_nan=False)   # all versions: finite numbers only
-
     shot_size: ShotSize = ShotSize.medium      # informational; used by planners/QA
     lens_mm: float = Field(35, ge=8, le=300)
     look_at: Identifier | None = None          # character/prop (or v1.1 primitive) to track
