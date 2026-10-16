@@ -311,3 +311,72 @@ def test_no_marker_when_there_is_nothing_to_merge(tmp_path, monkeypatch):
     fake_blender(monkeypatch, ok_report())
     run_shot(M1, tmp_path, render=False)
     assert_clean_success(tmp_path)
+
+
+# ===========================================================================
+# Milestone 4: shot_warnings() merged with camera_warnings()
+# ===========================================================================
+M4 = json.loads((REPO / "schemas/examples/m4_sequence.json").read_text())
+SHORT_SHOT_WARNING = ("shot 'sh01_wide' is 8 frame(s) long (frames 1-8); shots under 12 "
+                      "frames are very short")
+
+
+def with_short_first_shot() -> dict:
+    d = copy.deepcopy(M4)
+    d["shots"][0]["frame_end"] = 8
+    d["shots"][0]["camera"]["keys"][1]["frame"] = 8
+    d["shots"][1]["frame_start"] = 9
+    d["shots"][1]["camera"]["keys"][0]["frame"] = 9
+    return d
+
+
+def m4_report(tmp_path) -> dict:
+    return json.loads((tmp_path / "shots" / "m4_sequence" / "build_report.json").read_text())
+
+
+def test_shot_warning_is_merged_in_memory_and_on_disk(tmp_path, monkeypatch):
+    fake_blender(monkeypatch, ok_report(shot_id="m4_sequence"))
+    report = run_shot(with_short_first_shot(), tmp_path, render=False)
+    assert report["status"] == "ok"
+    assert report["warnings"] == [TEMPLATE_WARNING, SHORT_SHOT_WARNING]
+    assert m4_report(tmp_path)["warnings"] == [TEMPLATE_WARNING, SHORT_SHOT_WARNING]
+    assert not (tmp_path / "shots" / "m4_sequence" / REPORT_INCOMPLETE).exists()
+
+
+def test_shot_warning_is_not_duplicated(tmp_path, monkeypatch):
+    fake_blender(monkeypatch, ok_report(shot_id="m4_sequence",
+                                        warnings=[TEMPLATE_WARNING, SHORT_SHOT_WARNING]))
+    report = run_shot(with_short_first_shot(), tmp_path, render=False)
+    assert report["warnings"] == [TEMPLATE_WARNING, SHORT_SHOT_WARNING]
+
+
+def test_clean_multishot_spec_leaves_the_report_byte_identical(tmp_path, monkeypatch):
+    fake_blender(monkeypatch, ok_report(shot_id="m4_sequence"))
+    report = run_shot(M4, tmp_path, render=False)
+    assert report["warnings"] == [TEMPLATE_WARNING]
+    written = json.dumps(ok_report(shot_id="m4_sequence"), indent=2)
+    assert (tmp_path / "shots" / "m4_sequence" / "build_report.json").read_text() == written
+
+
+def test_camera_warnings_come_before_shot_warnings(tmp_path, monkeypatch):
+    """camera_warnings() only fires for 1.0/1.1 and shot_warnings() only for 1.3, so the two
+    never meet in one valid spec; the merge order is still camera first, then shots."""
+    monkeypatch.setattr(blender_job, "camera_warnings", lambda s: ["cam w", "dup"])
+    monkeypatch.setattr(blender_job, "shot_warnings", lambda s: ["dup", "shot w"])
+    fake_blender(monkeypatch, ok_report(shot_id="m4_sequence"))
+    report = run_shot(M4, tmp_path, render=False)
+    assert report["warnings"] == [TEMPLATE_WARNING, "cam w", "dup", "shot w"]   # deduplicated
+
+
+def test_shot_warning_merge_failure_uses_the_incomplete_marker(tmp_path, monkeypatch):
+    fake_blender(monkeypatch, ok_report(shot_id="m4_sequence"))
+
+    def replace(src, dst):
+        raise PermissionError(5, "Access is denied (simulated)")
+    monkeypatch.setattr(blender_job.os, "replace", replace)
+    report = run_shot(with_short_first_shot(), tmp_path, render=False)
+    assert report["status"] == "report_error"
+    assert SHORT_SHOT_WARNING not in m4_report(tmp_path)["warnings"]
+    assert (tmp_path / "shots" / "m4_sequence" / REPORT_INCOMPLETE).is_file()
+    with pytest.raises(ContactSheetError, match="failed or was interrupted"):
+        load_render(tmp_path / "shots" / "m4_sequence")

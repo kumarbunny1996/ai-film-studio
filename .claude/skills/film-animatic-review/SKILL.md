@@ -1,6 +1,6 @@
 ---
 name: film-animatic-review
-description: Review checklist for a rendered animatic before the human_approval stage — run the contact-sheet worker, check its evidence (review/contact_sheet.png, review/frame_report.json) and the build outputs against explicit hard gates, then review framing, motion, lighting, continuity and frame aesthetics. Use after an animatic or smoke render finishes, when asked whether a shot is ready for approval, or when a render "looks wrong". Produces evidence and findings only; it never approves a shot.
+description: Review checklist for a rendered animatic before the human_approval stage — run the contact-sheet worker, check its evidence (review/contact_sheet.png, review/frame_report.json) and the build outputs against explicit hard gates, then review framing, motion, lighting, continuity, cut boundaries (v1.3 multi-shot sequences) and frame aesthetics. Use after an animatic or smoke render finishes, when asked whether a shot is ready for approval, or when a render "looks wrong". Produces evidence and findings only; it never approves a shot.
 ---
 
 <!-- Adapted from RobLe3/cc-blender-skill@a2634b588e80265e796aa53f8ab178d75105c2af,
@@ -76,8 +76,8 @@ Paths are relative to the shot directory unless stated.
 | Evidence | Produced by | Key contents |
 |---|---|---|
 | Validated SceneSpec, `spec.json` | `workers/blender_job.py` (`SceneSpec` + `validate_against_manifest()`) | The shot as planned. The worker does not re-validate it |
-| `build_report.json` | `blender/scripts/build_scene.py` | `status`, `warnings`, `frame_range`, `resolution` (actual rendered size), `fps`, `frames_dir`, `smoke` (smoke renders only) |
-| `frames/<shot_id>_####.png` | `build_scene.py` | One PNG per frame in `frame_range` |
+| `build_report.json` | `blender/scripts/build_scene.py` | `status`, `warnings`, `frame_range`, `resolution` (actual rendered size), `fps`, `frames_dir`, `smoke` (smoke renders only); for v1.3 multi-shot: `shots`, `cuts`, and on smoke runs `smoke_frames` / `rendered_frames` |
+| `frames/<shot_id>_####.png` | `build_scene.py` | One PNG per frame in `frame_range`; for a multi-shot smoke run only the `rendered_frames` stills are new (other files may be stale) |
 | MP4 + `.ffmpeg.log` + `.summary.json` in the project directory | `workers/run_milestone1.py` only (`workers/encode.py`) | Encoded shot and ffprobe verification. `run_shot()` alone doesn't encode |
 | **`review/contact_sheet.png`** | `workers/contact_sheet.py` | 8-bit RGB grid of sampled frames, in order, left to right, top to bottom. Each tile is labelled with its Blender frame number when `contact_sheet.labels` is true; unused cells are black |
 | **`review/frame_report.json`** | `workers/contact_sheet.py` | Schema `frame_report.v1`; fields below |
@@ -133,6 +133,45 @@ re-render.
 stops after 8 frames. Judge framing, motion, timing and light direction, not
 final image quality, noise or motion blur.
 
+## Multi-shot sequences (SceneSpec v1.3)
+
+**Pipeline:**
+1. Validate the spec and render it in full:
+   `uv run python -m workers.run_milestone1 --spec <spec.json> --project <project-dir>`.
+   This validates the SceneSpec, renders the **whole timeline** in one Blender
+   pass (cuts are camera switches on that timeline), checks every frame,
+   encodes and runs ffprobe.
+2. Check `build_report.json`: `status: ok`, `shots` (each shot's camera
+   object, marker and settings) and `cuts`.
+3. Encode **only a complete, contiguous frame sequence**. `run_milestone1`
+   does this; don't encode frames by hand.
+4. Run the contact-sheet worker on the shot directory.
+5. Inspect compositions **and every cut**: open the frames immediately before
+   and after each cut (`cuts[i] - 1` and `cuts[i]`), as well as the contact
+   sheet, which may not sample cut frames.
+6. A human approves. Nothing else does.
+
+**Smoke mode for multi-shot specs** (`--smoke`) renders only the **first and
+last frame of each shot**, at 50% resolution, as stills. It's a diagnostic
+check that every shot camera renders. **It is not an animation.** Its report
+lists `smoke_frames` and `rendered_frames`, while `frame_range` stays the full
+timeline.
+
+**Partial output is refused, from the report itself:**
+- If `rendered_frames` doesn't cover every frame of `frame_range` exactly
+  once, the encoder stops with "Partial (smoke) render; not encodable". The
+  contact-sheet worker stops with "Partial (smoke) render; not reviewable".
+  The same applies to malformed `rendered_frames` or `frame_range`.
+- This holds **even when stale frame files from an earlier render fill the
+  folder**: file existence, size and age are not evidence of completeness.
+- The guard never deletes or modifies existing frames.
+- Treat such a shot as `NOT_REVIEWABLE` and do a full render.
+
+**Metrics at cuts are supporting evidence only.** A high `scene_score` or
+`ydif` at a cut frame is expected, but it doesn't prove the cut is correct;
+inspect the frames. The 180° rule and other continuity checks are **not**
+automated (see `film-camera`).
+
 ## NOT_REVIEWABLE
 
 Report `NOT_REVIEWABLE` with the reason when any of these apply.
@@ -146,7 +185,9 @@ Report `NOT_REVIEWABLE` with the reason when any of these apply.
   - any expected frame is missing, or the first or last frame's size differs
     from `resolution`;
   - a frame can't be decoded, FFmpeg/ffprobe fails, is missing or times out,
-    or the analysis covers fewer frames than expected.
+    or the analysis covers fewer frames than expected;
+  - the report's `rendered_frames` doesn't cover `frame_range` exactly once
+    ("Partial (smoke) render; not reviewable").
 - **Required outputs are missing**: either `review/contact_sheet.png` or
   `review/frame_report.json`.
 - **The outputs aren't for this render**:
@@ -166,7 +207,8 @@ Report `NOT_REVIEWABLE` with the reason when any of these apply.
    and `fps`. Don't compare resolution with the SceneSpec's
    `render.resolution`, which is full size. The frame range must match the
    SceneSpec unless it's a smoke render, and a smoke render is never accepted
-   as final.
+   as final. A multi-shot smoke render can't be encoded at all ("Partial
+   (smoke) render; not encodable").
 3. The worker succeeded for this exact render: both review outputs exist,
    `frame_report.json` is newer than `build_report.json`, and its `render`
    block matches the build report.
@@ -209,6 +251,7 @@ ANIMATIC REVIEW — <shot_id>
 Status: NOT_REVIEWABLE | CHANGES_REQUESTED | READY_FOR_HUMAN_APPROVAL
 Render: <frames_dir>, frames <start>-<end>, <w>x<h> @ <fps>, smoke=<true|false>
 Evidence: review/contact_sheet.png, review/frame_report.json (sampled <frames>)
+Cuts (v1.3): <frame N-1 | N for each cut → camera before/after, checked visually>
 Hard gates: 1 <pass/fail> · 2 <…> · 3 <…> · 4 <…> · 5 <…>
 Flags/warnings: <each one → explained / finding>
 Dimensions: <1–8 with pass / fail / not checked>

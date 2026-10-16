@@ -791,6 +791,38 @@
       "title": "RenderSettings",
       "type": "object"
     },
+    "Shot": {
+      "additionalProperties": false,
+      "description": "v1.3: one camera over a contiguous range of the scene's single timeline. Cuts between\nshots come from the shared timeline, so the set and its motion stay continuous.",
+      "properties": {
+        "shot_id": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Shot Id",
+          "type": "string"
+        },
+        "frame_start": {
+          "minimum": 1,
+          "title": "Frame Start",
+          "type": "integer"
+        },
+        "frame_end": {
+          "minimum": 1,
+          "title": "Frame End",
+          "type": "integer"
+        },
+        "camera": {
+          "$ref": "#/$defs/Camera"
+        }
+      },
+      "required": [
+        "shot_id",
+        "frame_start",
+        "frame_end",
+        "camera"
+      ],
+      "title": "Shot",
+      "type": "object"
+    },
     "ShotSize": {
       "enum": [
         "extreme_wide",
@@ -1003,6 +1035,74 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "spec_version": {
+            "enum": [
+              "1.0",
+              "1.1",
+              "1.2"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "camera": {
+            "type": "object"
+          },
+          "shots": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "camera"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "spec_version": {
+            "const": "1.3"
+          }
+        },
+        "required": [
+          "spec_version"
+        ]
+      },
+      "then": {
+        "oneOf": [
+          {
+            "properties": {
+              "camera": {
+                "type": "object"
+              },
+              "shots": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "camera"
+            ]
+          },
+          {
+            "properties": {
+              "shots": {
+                "type": "array"
+              },
+              "camera": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "shots"
+            ]
+          }
+        ]
+      }
     }
   ],
   "properties": {
@@ -1011,7 +1111,8 @@
       "enum": [
         "1.0",
         "1.1",
-        "1.2"
+        "1.2",
+        "1.3"
       ],
       "title": "Spec Version",
       "type": "string"
@@ -1096,7 +1197,32 @@
       "type": "array"
     },
     "camera": {
-      "$ref": "#/$defs/Camera"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Camera"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "shots": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Shot"
+          },
+          "maxItems": 8,
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Shots"
     }
   },
   "required": [
@@ -1104,8 +1230,7 @@
     "scene_id",
     "shot_id",
     "description",
-    "environment",
-    "camera"
+    "environment"
   ],
   "title": "SceneSpec",
   "type": "object"

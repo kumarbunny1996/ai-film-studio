@@ -399,7 +399,7 @@ def test_several_v12_fields_are_all_named_in_the_error():
 
 
 def test_unknown_spec_version_still_rejected():
-    rejected(v12() | {"spec_version": "1.3"}, "spec_version")
+    rejected(v12() | {"spec_version": "1.4"}, "spec_version")
 
 
 # --- conflict rules: errors in 1.2, accepted (with warnings) in 1.0/1.1 ----------

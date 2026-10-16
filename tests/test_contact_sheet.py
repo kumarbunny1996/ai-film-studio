@@ -853,3 +853,65 @@ def test_incomplete_marker_with_force_removes_old_evidence_and_refuses(tmp_path,
     assert main(["--shot-dir", str(shot), "--force"]) == 1
     assert "failed or was interrupted" in capsys.readouterr().err
     assert_no_results(shot)
+
+
+# --- Audit P1-1: partial (smoke) renders are never reviewed -----------------------
+SMOKE_24 = [1, 8, 9, 16, 17, 24]          # first and last frame of shots 1-8, 9-16, 17-24
+
+
+def frame_snapshot(shot: Path) -> dict:
+    import hashlib
+    return {p.name: (hashlib.sha256(p.read_bytes()).hexdigest(), p.stat().st_mtime_ns)
+            for p in sorted((shot / "frames").glob("*.png"))}
+
+
+@needs_ffmpeg
+def test_smoke_over_stale_full_render_is_refused_before_any_output(tmp_path):
+    shot = make_shot(tmp_path, count=24, smoke=True, smoke_frames=SMOKE_24,
+                     rendered_frames=SMOKE_24)
+    ffmpeg_frames(shot / "frames" / "shot_%04d.png", "color=c=red:s=160x90:r=24", 1, 1)
+    before = frame_snapshot(shot)
+    assert len(before) == 24                       # every expected file exists: not evidence
+    with pytest.raises(ContactSheetError, match=r"Partial \(smoke\) render; not reviewable: 18 "
+                                                r"of 24 frames in 1-24 were not rendered"):
+        run(shot)
+    assert not (shot / "review").exists()          # nothing published, nothing partial
+    assert frame_snapshot(shot) == before          # stale frames untouched
+
+
+@needs_ffmpeg
+def test_partial_render_with_force_removes_old_review_and_publishes_nothing(tmp_path, capsys):
+    shot = make_shot(tmp_path, count=24)
+    assert main(["--shot-dir", str(shot)]) == 0           # review of an earlier full render
+    capsys.readouterr()
+    rep = json.loads((shot / "build_report.json").read_text())
+    rep.update(smoke=True, smoke_frames=SMOKE_24, rendered_frames=SMOKE_24)
+    (shot / "build_report.json").write_text(json.dumps(rep))
+    before = frame_snapshot(shot)
+    assert main(["--shot-dir", str(shot), "--force"]) == 1
+    assert "Partial (smoke) render; not reviewable" in capsys.readouterr().err
+    assert_no_results(shot)                               # old evidence not left looking current
+    assert frame_snapshot(shot) == before
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("order", ["sorted", "reversed"])
+def test_complete_rendered_frames_is_reviewed(tmp_path, order):
+    frames = list(range(1, 25)) if order == "sorted" else list(range(24, 0, -1))
+    shot = make_shot(tmp_path, count=24, rendered_frames=frames)
+    run(shot)
+    assert load_report(shot)["render"]["frame_count"] == 24
+
+
+@needs_ffmpeg
+@pytest.mark.parametrize("rendered", [
+    [f for f in range(1, 25) if f != 12], list(range(1, 25)) + [12], list(range(1, 26)),
+    [], [True] * 24, [str(f) for f in range(1, 25)], [float(f) for f in range(1, 25)],
+    "1-24", None,
+], ids=["one-missing", "duplicate", "unexpected", "empty", "bools", "strings", "floats",
+        "not-a-list", "null"])
+def test_malformed_or_incomplete_rendered_frames_are_not_reviewed(tmp_path, rendered):
+    shot = make_shot(tmp_path, count=24, rendered_frames=rendered)
+    before = frame_snapshot(shot)
+    _expect_rejected(shot, r"Partial \(smoke\) render; not reviewable")
+    assert frame_snapshot(shot) == before

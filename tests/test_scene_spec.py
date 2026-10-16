@@ -177,7 +177,7 @@ def test_committed_json_schema_is_current():
 
 def test_json_schema_describes_both_versions():
     schema = SceneSpec.model_json_schema()
-    assert schema["properties"]["spec_version"]["enum"] == ["1.0", "1.1", "1.2"]
+    assert schema["properties"]["spec_version"]["enum"] == ["1.0", "1.1", "1.2", "1.3"]
     rule = schema["allOf"][0]
     assert rule["if"]["properties"]["spec_version"]["const"] == "1.0"
     assert rule["then"]["properties"]["primitives"]["maxItems"] == 0

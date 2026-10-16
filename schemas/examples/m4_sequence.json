@@ -1,0 +1,47 @@
+{
+  "spec_version": "1.3",
+  "project_id": "milestone4_sequence",
+  "scene_id": "sc01",
+  "shot_id": "m4_sequence",
+  "description": "Milestone 4 multi-shot demo: a SceneSpec 1.3 scene rendered on one timeline, with timeline markers switching cameras. A red sphere rolls left to right past two stone pillars on one continuous timeline, covered by three shots with hard cuts: a 28 mm wide establishing shot, a 50 mm tracking shot alongside it, and an 85 mm close-up holding the sphere on the left third line.",
+  "render": {"quality": "final", "engine": "eevee", "resolution": [640, 360],
+             "fps": 24, "frame_start": 1, "frame_end": 132, "samples": 16,
+             "motion_blur": false, "seed": 0},
+  "environment": {"world_color": [0.45, 0.55, 0.70]},
+  "lighting": {"preset": "midday", "sun_azimuth_deg": 140},
+  "primitives": [
+    {"name": "ground", "shape": "plane", "size": 30,
+     "material": {"base_color": [0.30, 0.34, 0.28], "roughness": 0.9}},
+    {"name": "pillar_left", "shape": "cylinder", "size": 2.0,
+     "transform": {"location": [-2.0, 1.5, 1.0]},
+     "material": {"base_color": [0.55, 0.55, 0.58], "roughness": 0.7}},
+    {"name": "pillar_right", "shape": "cylinder", "size": 2.0,
+     "transform": {"location": [2.5, 1.5, 1.0]},
+     "material": {"base_color": [0.55, 0.55, 0.58], "roughness": 0.7}},
+    {"name": "hero", "shape": "sphere", "size": 0.6,
+     "material": {"base_color": [0.80, 0.12, 0.08], "roughness": 0.35},
+     "keys": [
+       {"frame": 1, "location": [-4.0, 0.0, 0.3], "easing": "linear"},
+       {"frame": 132, "location": [4.0, 0.0, 0.3]}
+     ]}
+  ],
+  "shots": [
+    {"shot_id": "sh01_wide", "frame_start": 1, "frame_end": 48,
+     "camera": {"shot_size": "wide", "lens_mm": 28, "look_at": "hero", "look_at_height": 0.0,
+                "dof_enabled": false,
+                "keys": [{"frame": 1, "location": [0.0, -14.0, 3.5]},
+                         {"frame": 48, "location": [0.5, -13.5, 3.4]}]}},
+    {"shot_id": "sh02_track", "frame_start": 49, "frame_end": 96,
+     "camera": {"shot_size": "medium", "lens_mm": 50, "look_at": "hero", "look_at_height": 0.0,
+                "dof_enabled": true, "fstop": 4.0,
+                "keys": [{"frame": 49, "location": [-2.0, -6.0, 1.4], "easing": "linear"},
+                         {"frame": 96, "location": [1.5, -6.0, 1.4]}]}},
+    {"shot_id": "sh03_close", "frame_start": 97, "frame_end": 132,
+     "camera": {"shot_size": "close_up", "lens_mm": 85, "look_at": "hero", "look_at_height": 0.0,
+                "framing": {"subject_offset": [-0.1667, 0.0]},
+                "clip_start_m": 0.05, "clip_end_m": 100,
+                "dof_enabled": true, "focus_target": "hero", "fstop": 2.8,
+                "keys": [{"frame": 97, "location": [3.0, -3.5, 1.0]},
+                         {"frame": 132, "location": [3.8, -3.2, 1.0]}]}}
+  ]
+}

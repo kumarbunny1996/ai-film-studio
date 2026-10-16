@@ -39,7 +39,7 @@ import bmesh
 import bpy
 from mathutils import Euler
 
-SUPPORTED_SPECS = ("1.0", "1.1", "1.2")
+SUPPORTED_SPECS = ("1.0", "1.1", "1.2", "1.3")
 SHOT_COLLECTION = "SHOT"
 SMOKE_FRAMES = 8
 
@@ -453,12 +453,16 @@ def build_primitives(prims: list[dict], shot_coll, report: Report) -> dict[str, 
     return objs
 
 
-def aim_target(name: str, roots: dict, height: float, shot_coll) -> bpy.types.Object:
+def aim_target(name: str, roots: dict, height: float, shot_coll,
+               prefix: str = "AIM-") -> bpy.types.Object:
+    """Empty the camera aims (and focuses) at. One per prefix + target: a single-camera
+    shot uses AIM-<target>; each v1.3 shot camera gets its own (AIM-<shot_id>-<target>) so
+    shots can differ in look_at_height and handheld shake without sharing an aim point."""
     if name not in roots:
         raise BuildError(f"camera target '{name}' does not exist in this shot")
-    aim = bpy.data.objects.get(f"AIM-{name}")
+    aim = bpy.data.objects.get(f"{prefix}{name}")
     if aim is None:
-        aim = make_empty(f"AIM-{name}", shot_coll, 0.2)
+        aim = make_empty(f"{prefix}{name}", shot_coll, 0.2)
         target = roots[name]
         if target.get("afs_primitive"):
             # follow position only, so a spinning or squashing primitive doesn't swing the aim
@@ -483,16 +487,18 @@ def framing_shift(offset: list[float], width: int, height: int) -> tuple[float, 
     return -x + 0.0, -y * height / width + 0.0        # + 0.0 turns -0.0 into 0.0
 
 
-def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> dict:
-    """Build CAM-shot from a validated camera spec; return its effective settings.
+def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int,
+                 name: str = "CAM-shot", aim_prefix: str = "AIM-") -> dict:
+    """Build a camera from a validated camera spec; return its effective settings.
 
-    v1.2 fields (framing, clip_start_m, clip_end_m, focus_distance_m) change nothing when
-    absent, so 1.0/1.1 cameras are built exactly as before.
+    The defaults build the single-camera CAM-shot exactly as before; v1.3 shots pass their
+    own camera name and aim prefix. v1.2 fields (framing, clip_start_m, clip_end_m,
+    focus_distance_m) change nothing when absent, so 1.0/1.1 cameras are built as before.
     """
-    data = bpy.data.cameras.new("CAM-shot")
+    data = bpy.data.cameras.new(name)
     data.lens = cam_spec.get("lens_mm", 35)
     data.sensor_width = 36
-    cam = bpy.data.objects.new("CAM-shot", data)
+    cam = bpy.data.objects.new(name, data)
     shot_coll.objects.link(cam)
     scene.camera = cam
 
@@ -514,7 +520,7 @@ def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> di
 
     shake = cam_spec.get("handheld_shake", 0.0)
     if look_at:
-        aim = aim_target(look_at, roots, height, shot_coll)
+        aim = aim_target(look_at, roots, height, shot_coll, aim_prefix)
         con = cam.constraints.new("TRACK_TO")
         con.target = aim
         con.track_axis = "TRACK_NEGATIVE_Z"
@@ -532,7 +538,7 @@ def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> di
     focus = cam_spec.get("focus_target") or look_at
     focus_distance = cam_spec.get("focus_distance_m")
     if data.dof.use_dof and focus:
-        data.dof.focus_object = aim_target(focus, roots, height, shot_coll)
+        data.dof.focus_object = aim_target(focus, roots, height, shot_coll, aim_prefix)
         data.dof.aperture_fstop = cam_spec.get("fstop", 2.8)
     elif data.dof.use_dof and focus_distance is not None:          # v1.2
         data.dof.focus_distance = focus_distance
@@ -566,6 +572,33 @@ def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> di
                 "fstop": round(data.dof.aperture_fstop, 6) if data.dof.use_dof else None},
         "handheld_shake": shake,
     }
+
+
+def setup_shots(scene, shot_coll, shots: list[dict], roots: dict, seed: int) -> list[dict]:
+    """v1.3: one CAM-<shot_id> per shot, cut by timeline markers on one shared timeline.
+
+    A marker CUT-<shot_id> at each shot's frame_start is bound to its camera, so Blender
+    switches the active camera on frame_set and while rendering (verified in Blender 5.2.2 by
+    evaluation and by a rendered-frame metadata check). Each camera gets its own aim empties.
+    """
+    out = []
+    for s in shots:
+        sid = s["shot_id"]
+        cam_name, marker_name = f"CAM-{sid}", f"CUT-{sid}"
+        settings = setup_camera(scene, shot_coll, s["camera"], roots, seed,
+                                name=cam_name, aim_prefix=f"AIM-{sid}-")
+        marker = scene.timeline_markers.new(marker_name, frame=s["frame_start"])
+        marker.camera = bpy.data.objects[cam_name]
+        out.append({"shot_id": sid, "frame_range": [s["frame_start"], s["frame_end"]],
+                    "frame_count": s["frame_end"] - s["frame_start"] + 1,
+                    "camera_object": cam_name, "marker": marker_name, "camera": settings})
+    return out
+
+
+def smoke_frames(shots: list[dict]) -> list[int]:
+    """Frames a v1.3 multi-shot smoke render covers: the first and last frame of every shot,
+    i.e. both sides of every cut, so every shot camera is exercised."""
+    return sorted({f for s in shots for f in (s["frame_start"], s["frame_end"])})
 
 
 def setup_render(scene, r: dict, shot_id: str, out: Path) -> None:
@@ -627,6 +660,8 @@ def parse_args() -> argparse.Namespace:
 def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     if spec.get("spec_version", "1.0") not in SUPPORTED_SPECS:
         raise BuildError(f"spec_version {spec.get('spec_version')} not in {SUPPORTED_SPECS}")
+    if not spec.get("shots") and not spec.get("camera"):
+        raise BuildError("spec has neither camera nor shots (validate it with SceneSpec first)")
     if not bpy.data.filepath:
         report.warn("no style template loaded; starting from an empty scene")
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -640,8 +675,15 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     out = args.out.resolve()
 
     setup_render(scene, spec["render"], spec["shot_id"], out)
+    shots = spec.get("shots")                       # v1.3 multi-shot; None = single camera
+    still_frames = None
     if args.smoke:
-        scene.frame_end = min(scene.frame_end, scene.frame_start + SMOKE_FRAMES - 1)
+        if shots:
+            # keep the full timeline (markers, motion) but render only both sides of each cut
+            still_frames = smoke_frames(shots)
+            report.data["smoke_frames"] = still_frames
+        else:
+            scene.frame_end = min(scene.frame_end, scene.frame_start + SMOKE_FRAMES - 1)
         scene.render.resolution_percentage = 50
         report.data["smoke"] = True
     report.lap("render_setup")
@@ -688,7 +730,12 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     roots.update(build_primitives(spec.get("primitives", []), shot_coll, report))
     report.lap("primitives")
 
-    report.data["camera"] = setup_camera(scene, shot_coll, spec["camera"], roots, seed)
+    if shots:
+        report.data["shots"] = setup_shots(scene, shot_coll, shots, roots, seed)
+        report.data["cuts"] = [s["frame_start"] for s in shots[1:]]
+        scene.frame_set(scene.frame_start)          # saved scene.camera = the first shot's
+    else:
+        report.data["camera"] = setup_camera(scene, shot_coll, spec["camera"], roots, seed)
     report.lap("camera")
 
     out.mkdir(parents=True, exist_ok=True)
@@ -698,7 +745,22 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     report.lap("save")
 
     if not args.no_render:
-        bpy.ops.render.render(animation=True)
+        if still_frames:
+            # multi-shot smoke: frame_set switches the marker-bound camera, then one still
+            # per frame. write_still uses filepath literally (no #### substitution), so each
+            # still gets the exact name an animation render would give that frame.
+            pattern = scene.render.filepath
+            paths = {f: scene.render.frame_path(frame=f) for f in still_frames}  # from pattern
+            try:
+                for f in still_frames:
+                    scene.frame_set(f)
+                    scene.render.filepath = paths[f]
+                    bpy.ops.render.render(write_still=True)
+            finally:
+                scene.render.filepath = pattern
+            report.data["rendered_frames"] = still_frames
+        else:
+            bpy.ops.render.render(animation=True)
         report.data["frames_dir"] = str(out / "frames")
         report.data["frame_range"] = [scene.frame_start, scene.frame_end]
         pct = scene.render.resolution_percentage / 100

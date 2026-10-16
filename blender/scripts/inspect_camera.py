@@ -11,7 +11,16 @@ vectors, lens, clipping, shift and depth of field, plus where each --project obj
 origin lands in normalised camera coordinates (0,0 = bottom-left, 1,1 = top-right of the
 rendered frame, as bpy_extras.object_utils.world_to_camera_view defines them).
 
-Used by tests/test_camera_builder.py to pin what build_scene.py actually builds.
+--camera chooses what to inspect:
+    CAM-shot (default)  the single-camera shot camera; output exactly as before
+    <name>              any other camera object by name, fixed for every frame
+    active              v1.3 multi-shot: after scene.frame_set(f), whichever camera the
+                        timeline markers made active (scene.camera). Adds "markers",
+                        "cameras" and a per-frame "active_camera". frame_set is required:
+                        assigning scene.frame_current does not switch marker cameras.
+
+Used by tests/test_camera_builder.py and tests/test_multishot_builder.py to pin what
+build_scene.py actually builds.
 """
 import argparse
 import json
@@ -31,6 +40,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--frames", required=True, help="comma-separated frame numbers")
     p.add_argument("--project", default="", help="comma-separated object names to project")
+    p.add_argument("--camera", default=CAMERA_NAME,
+                   help=f"camera object name, or 'active' (default {CAMERA_NAME})")
     return p.parse_args(argv)
 
 
@@ -38,37 +49,54 @@ def vec(v) -> list[float]:
     return [round(float(c), 6) for c in v]
 
 
+def camera_info(cam) -> dict:
+    data = cam.data
+    return {
+        "type": data.type, "sensor_width": round(data.sensor_width, 6),
+        "sensor_fit": data.sensor_fit, "rotation_mode": cam.rotation_mode,
+        "parent": cam.parent.name if cam.parent else None,
+        "constraints": [{"type": c.type, "target": c.target.name if c.target else None,
+                         "track_axis": getattr(c, "track_axis", None),
+                         "up_axis": getattr(c, "up_axis", None)} for c in cam.constraints],
+        "dof_focus_object": data.dof.focus_object.name if data.dof.focus_object else None,
+    }
+
+
 def main() -> None:
     args = parse_args()
     scene = bpy.context.scene
-    cam = bpy.data.objects.get(CAMERA_NAME)
-    if cam is None or cam.type != "CAMERA":
-        raise SystemExit(f"no camera object {CAMERA_NAME!r} in {bpy.data.filepath}")
+    active_mode = args.camera == "active"
+    if active_mode:
+        if not scene.timeline_markers or scene.camera is None:
+            raise SystemExit(f"--camera active needs timeline markers and a scene camera in "
+                             f"{bpy.data.filepath}")
+        fixed = None
+    else:
+        fixed = bpy.data.objects.get(args.camera)
+        if fixed is None or fixed.type != "CAMERA":
+            raise SystemExit(f"no camera object {args.camera!r} in {bpy.data.filepath}")
     names = [n for n in args.project.split(",") if n]
     missing = [n for n in names if bpy.data.objects.get(n) is None]
     if missing:
         raise SystemExit(f"objects not found: {missing}")
 
-    data = cam.data
     out = {
         "blend": bpy.data.filepath,
         "scene_camera": scene.camera.name if scene.camera else None,
         "resolution": [scene.render.resolution_x, scene.render.resolution_y,
                        scene.render.resolution_percentage],
-        "camera": {
-            "type": data.type, "sensor_width": round(data.sensor_width, 6),
-            "sensor_fit": data.sensor_fit, "rotation_mode": cam.rotation_mode,
-            "parent": cam.parent.name if cam.parent else None,
-            "constraints": [{"type": c.type, "target": c.target.name if c.target else None,
-                             "track_axis": getattr(c, "track_axis", None),
-                             "up_axis": getattr(c, "up_axis", None)} for c in cam.constraints],
-            "dof_focus_object": data.dof.focus_object.name if data.dof.focus_object else None,
-        },
+        "camera": camera_info(fixed) if fixed else None,
         "frames": [],
     }
+    if active_mode:
+        markers = sorted(scene.timeline_markers, key=lambda m: m.frame)
+        out["markers"] = [{"name": m.name, "frame": m.frame,
+                           "camera": m.camera.name if m.camera else None} for m in markers]
+        out["cameras"] = {m.camera.name: camera_info(m.camera) for m in markers if m.camera}
     for f in (int(x) for x in args.frames.split(",")):
         scene.frame_set(f)
         depsgraph = bpy.context.evaluated_depsgraph_get()
+        cam = scene.camera if active_mode else fixed
         ev = cam.evaluated_get(depsgraph)
         m = ev.matrix_world
         data = ev.data                                   # animated lens etc. at this frame
@@ -85,6 +113,8 @@ def main() -> None:
                     "focus_distance": round(data.dof.focus_distance, 6)},
             "projected": {},
         }
+        if active_mode:
+            frame["active_camera"] = cam.name
         for n in names:
             obj = bpy.data.objects[n].evaluated_get(depsgraph)
             p = world_to_camera_view(scene, ev, obj.matrix_world.translation)

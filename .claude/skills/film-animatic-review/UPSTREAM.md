@@ -62,3 +62,16 @@ Added (project-specific, not from upstream):
   report format with statuses (`NOT_REVIEWABLE`, `CHANGES_REQUESTED`,
   `READY_FOR_HUMAN_APPROVAL`; never "approved"), and routing of fixes to
   SceneSpec fields via `film-camera`, `film-lighting` and `shot-composition`.
+
+Updated for SceneSpec v1.3 (Milestone 4, project branch `milestone4/multishot-schema`):
+
+- A multi-shot section: the full-render pipeline with `run_milestone1`, the
+  `shots`/`cuts` build-report fields, and reviewing the frames either side of
+  every cut as well as the contact sheet.
+- What multi-shot smoke mode renders (first and last frame of each shot, 50%,
+  stills), and the encoder and contact-sheet refusals of partial
+  `rendered_frames` reports, which hold even when stale frames fill the folder.
+- Scene-change metrics at cuts are supporting evidence only; the 180° rule is
+  not automated.
+- The partial-render refusal added to NOT_REVIEWABLE and the hard gates, and a
+  Cuts line in the report format.

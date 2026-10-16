@@ -1,6 +1,6 @@
 ---
 name: film-camera
-description: Plan a shot's camera as validated SceneSpec JSON — shot size, focal length, camera position, XYZ rotation and keys, look-at tracking, off-centre subject placement (framing.subject_offset), clipping range, depth of field (focus object or focus distance), camera moves (push-in, dolly, orbit, zoom, crane, locked-off) and handheld shake. Use when filling or reviewing the `camera` section of a SceneSpec (v1.0, v1.1 or v1.2), turning a shot-list entry or a shot-composition plan into camera data, or deciding whether a requested camera behaviour needs a SceneSpec schema change. Planning only; never writes or runs Blender code.
+description: Plan a shot's camera as validated SceneSpec JSON — shot size, focal length, camera position, XYZ rotation and keys, look-at tracking, off-centre subject placement (framing.subject_offset), clipping range, depth of field (focus object or focus distance), camera moves (push-in, dolly, orbit, zoom, crane, locked-off), handheld shake, and v1.3 multi-shot sequences (`shots[]` with hard cuts on one timeline). Use when filling or reviewing the `camera` or `shots` section of a SceneSpec (v1.0–v1.3), turning a shot list or a shot-composition plan into camera data, or deciding whether a requested camera behaviour needs a SceneSpec schema change. Planning only; never writes or runs Blender code.
 ---
 
 <!-- Adapted from RobLe3/cc-blender-skill@a2634b588e80265e796aa53f8ab178d75105c2af,
@@ -17,8 +17,9 @@ focus, position and movement for storytelling — and express them as
 ## Hard rules
 
 1. **Output is data, not code.** Produce or edit only the `camera` object of a
-   SceneSpec (`apps/api/schemas/scene_spec.py`), plus `spec_version` when a v1.2
-   field is needed. Never write bpy/Python for Blender, never ask to run
+   SceneSpec (`apps/api/schemas/scene_spec.py`), or in v1.3 the `shots` list,
+   plus `spec_version` when a newer field is needed. Never write bpy/Python for
+   Blender, never ask to run
    generated code, and never use a Blender MCP server or live Blender session.
    Plain arithmetic to choose numbers (distances, angles) is planning and is
    fine.
@@ -50,10 +51,13 @@ focus, position and movement for storytelling — and express them as
 |---|---|
 | 1.0, 1.1 | Everything in the field table except the v1.2 rows. Still valid and built exactly as before |
 | **1.2** | Adds `framing.subject_offset`, `clip_start_m`, `clip_end_m`, `focus_distance_m`, and turns two silently ignored cases into errors (see *Legacy behaviour*) |
+| **1.3** | Adds `shots`: several cameras cutting on one shared timeline (see *Multi-shot sequences*). A 1.3 spec has **exactly one** of `camera` (a single shot, built exactly as in 1.2) or `shots` |
 
 - **v1.2 fields in 1.0/1.1 are rejected.** An omitted `spec_version` means
   1.0. Set `"spec_version": "1.2"` when you need a v1.2 field.
-- **All versions:** every camera number must be finite. `NaN`, `Infinity` and
+- **`shots` in 1.0–1.2 is rejected, and those versions still require
+  `camera`.** Set `"spec_version": "1.3"` to use `shots`.
+- **All versions:** every number must be finite. `NaN`, `Infinity` and
   `-Infinity` are rejected.
 
 ## Fields
@@ -263,11 +267,98 @@ Leave `clip_start_m`/`clip_end_m` unset unless a shot needs them (v1.2):
 - Lower `clip_end_m` for small sets.
 - Raise it (up to 100000) for very large environments.
 
+## Multi-shot sequences (v1.3)
+
+One SceneSpec describes **one set and one continuous timeline**: environment,
+lighting, primitives and their motion are defined once. `shots` cuts that
+timeline between cameras. Because every shot samples the same timeline, motion
+stays continuous across each cut by construction. Cuts are hard cuts only.
+
+```json
+"spec_version": "1.3",
+"render": {"frame_start": 1, "frame_end": 132, "...": "..."},
+"shots": [
+  {"shot_id": "sh01_wide",  "frame_start": 1,  "frame_end": 48,  "camera": { ... }},
+  {"shot_id": "sh02_track", "frame_start": 49, "frame_end": 96,  "camera": { ... }},
+  {"shot_id": "sh03_close", "frame_start": 97, "frame_end": 132, "camera": { ... }}
+]
+```
+
+**Rules** (enforced by `SceneSpec`; ranges are inclusive):
+
+- **Exactly one form.** A 1.3 spec has `camera` or `shots`, never both and
+  never neither (`null` counts as absent).
+- **Shot count and ids:** 1–8 shots, each with a unique `shot_id` (same
+  identifier rules as other names). The top-level `shot_id` names the whole
+  sequence, used for file and folder names, and may equal a shot's id.
+- **Coverage:** shots are listed in time order, **contiguous** and
+  **non-overlapping**, and together cover exactly `render.frame_start` to
+  `render.frame_end`. Gaps, overlaps, shots out of order, or coverage that
+  stops short or runs past the render range are errors.
+- **Each shot's `camera` is a full camera** with every rule above, including
+  the strict 1.2 rules: no `rotation_deg` with `look_at`, and depth of field
+  must have a focus source. **Its keys must lie inside that shot's own range.**
+  Give each shot camera a key on its shot's first frame; it isn't animated
+  outside its shot.
+- **v1.2 camera fields** (`framing`, clipping, focus distance) are allowed in
+  any shot.
+- **Short shots** (fewer than 12 frames) are valid. `shot_warnings()` adds an
+  advisory warning to the build report; it is never a validation error.
+
+**What the builder does** (`setup_shots()` in `build_scene.py`):
+
+| Behaviour | Basis |
+|---|---|
+| One camera object per shot, named **`CAM-<shot_id>`** | measured |
+| A timeline marker **`CUT-<shot_id>`** at each shot's `frame_start`, bound to that shot's camera, so Blender switches cameras at each cut | measured; switching confirmed in a real render |
+| **Aim points are isolated per shot:** `AIM-<shot_id>-<target>`, so shots tracking the same subject can use different `look_at_height` and shake without interfering | measured |
+| `scene.frame_set(render.frame_start)` before saving, so the saved active camera is the first shot's | measured |
+| Build report: a `shots` list (id, frame range, frame count, camera object, marker, per-shot camera settings) and `cuts` (the frame each later shot starts on); no single `camera` block | measured |
+| A v1.3 **single-camera** spec takes the same path as 1.0–1.2: one `CAM-shot`, `AIM-<target>`, a `camera` report block | measured |
+
+**Inspecting the active camera.** Blender only switches marker-bound cameras
+when the frame is set with **`scene.frame_set(frame)`**. Assigning
+`scene.frame_current` and updating the view layer does **not** switch cameras.
+The fixed inspector does this for you:
+
+```
+blender -b <shot>.blend --factory-startup --python-exit-code 1 ^
+  -P blender/scripts/inspect_camera.py -- --out camera.json ^
+  --frames 1,48,49,50,96,97,98,132 --project PRIM-hero --camera active
+```
+
+`--camera active` reports `markers`, `cameras` and a per-frame
+`active_camera`, and projects each `--project` object through whichever camera
+is active on that frame. Without `--camera` (the default `CAM-shot`), the
+output is exactly the single-camera format.
+
+**Not implemented — don't plan around it or claim it:**
+
+- **The 180° rule, screen direction and other continuity checks are not
+  validated.** Keep cameras on one side of the line of action yourself. A
+  continuity rule needs its own design first.
+- **No validation of cinematic continuity or artistic quality.** Valid shots
+  and correct camera switching say nothing about whether the cut works.
+- **No per-shot lighting, set or timing changes,** no transitions other than
+  hard cuts, and no multiple scenes in one spec.
+
+**Verified example:** `schemas/examples/m4_sequence.json`: a sphere rolling
+past two pillars, covered by a 28 mm wide shot (1–48), a 50 mm tracking shot
+(49–96) and an 85 mm close-up on the left third (97–132). Its full 132-frame
+render was checked frame by frame at the cuts:
+
+- the inspector's active camera matched the rendered frames at 1, 48, 49, 50,
+  96, 97, 98 and 132;
+- the subject was centred in shots 1–2 and at x = 0.3333 in shot 3.
+
+The test suite also builds this spec without rendering and checks it
+(`tests/test_multishot_builder.py`).
+
 ## Legacy behaviour (1.0/1.1)
 
 1.0/1.1 specs keep validating and building exactly as before. Two cases that
-v1.2 rejects are still accepted there. After a successful build, the worker
-adds a warning for each to `build_report.json`:
+v1.2 and v1.3 reject are still accepted there. After a successful build, the
+worker adds a warning for each to `build_report.json`:
 
 | Legacy case | Builder behaviour (measured) | Build-report warning |
 |---|---|---|
@@ -279,9 +370,13 @@ remove the ignored data.
 
 ## Validator and builder checks before handoff
 
-- **Version and numbers:** `spec_version` is `"1.2"` if any v1.2 field is used.
-  All camera numbers are finite.
-- **Keys:** frames are unique, ascending and inside `render.frame_start…frame_end`.
+- **Version and numbers:** `spec_version` is `"1.2"` if any v1.2 field is used,
+  `"1.3"` if `shots` is used. All numbers are finite.
+- **Keys:** frames are unique, ascending and inside `render.frame_start…frame_end`
+  (for a shot camera, inside that **shot's** range).
+- **Shots (v1.3):** exactly one of `camera`/`shots`; unique `shot_id`s; ranges
+  in order, contiguous, covering the render range exactly; each shot camera
+  has a key on its shot's first frame; shots under 12 frames are deliberate.
 - **Rotation:** without `look_at`, every key has `rotation_deg`, unwrapped. In
   1.2, keys must **not** have `rotation_deg` when `look_at` is set.
 - **Lens:** if any key sets `lens_mm`, the first key sets it too.
@@ -327,8 +422,9 @@ inspection of that render.
 
 The builder writes the effective camera settings to `build_report.json` under
 `camera`: lens, `shift`, `clip`, `dof` (focus object, focus distance, f-stop),
-`subject_offset`, `look_at`, `lens_animated` and `handheld_shake`. Use them to
-confirm the spec was applied.
+`subject_offset`, `look_at`, `lens_animated` and `handheld_shake`. For a v1.3
+multi-shot spec the same block appears per shot under `shots[].camera`, with
+`cuts` listing the cut frames. Use them to confirm the spec was applied.
 
 Then produce review evidence with the contact-sheet worker and follow
 `film-animatic-review`:
@@ -354,6 +450,10 @@ still need a person to sign off.
 | Validation: rotation_deg with look_at (1.2) | Remove `rotation_deg` from the keys, or remove `look_at` |
 | Build `spec_error` "only supported for landscape or square frames" | Remove `framing`, or use a landscape/square `render.resolution` |
 | Small prop clipped in an extreme close-up | Lower `clip_start_m` (v1.2) |
+| Validation: "gap before shot …" / "starts at frame N, overlapping or out of order" (1.3) | List shots in time order; each `frame_start` is the previous `frame_end + 1` |
+| Validation: "shots end at frame X but render.frame_end is Y" (1.3) | Make the last shot end on `render.frame_end` (or change the render range) |
+| Validation: "shots[…].camera.keys at frames […] are outside the shot's range" (1.3) | Move that camera's keys inside its own shot |
+| Validation: "takes either camera … or shots …, not both" (1.3) | Remove `camera` when using `shots` |
 | Orbit drifts closer mid-move | More keys, closer together; push the middle keys outward |
 | Camera dips below ground | Raise the key Z values; add keys near low points |
 | Sky dominates a landscape | Lower the aim so the horizon sits on the lower third |
@@ -380,6 +480,9 @@ Known gaps right now:
 - No per-key `fstop` or focus pull between targets.
 - No path-following camera (curve), no shake frequency control.
 - `shot_size` is not checked against the actual framing.
+- Multi-shot (v1.3): no 180°/screen-direction rule, no automatic continuity
+  or artistic-quality check, hard cuts only, at most 8 shots, and every shot
+  shares one set, lighting and timeline.
 
 ## Reference
 

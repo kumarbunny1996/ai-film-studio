@@ -16,6 +16,11 @@ Versions:
        `clip_end_m`, `focus_distance_m`. In 1.2 only, `rotation_deg` together with
        `look_at`, and depth of field with nothing to focus on, are errors; 1.0/1.1 keep
        accepting them (see camera_warnings()). Every valid 1.1 spec is still valid as 1.1.
+  1.3  adds `shots`: several cameras cutting over one shared timeline. A 1.3 spec has
+       exactly one of `camera` (one shot, as before) or `shots`. Shots are listed in order,
+       contiguous, and exactly cover render.frame_start-frame_end; each shot's camera follows
+       every 1.2 camera rule, with its keys inside the shot. 1.0-1.2 specs are unchanged and
+       still require `camera`. Short shots are reported by shot_warnings(), not rejected.
 
 All versions: every number must be finite (NaN and +/-inf are rejected; see Strict).
 """
@@ -27,7 +32,7 @@ from typing import Annotated, Literal
 from pydantic import (BaseModel, ConfigDict, Field, field_validator, model_serializer,
                       model_validator)
 
-SPEC_VERSION = "1.2"                           # latest; "1.0" and "1.1" are still accepted
+SPEC_VERSION = "1.3"                           # latest; "1.0", "1.1" and "1.2" still accepted
 
 # ---------------------------------------------------------------------------
 # Primitives
@@ -320,11 +325,39 @@ class Camera(Strict):
 
 
 # ---------------------------------------------------------------------------
+# Shots (v1.3)
+# ---------------------------------------------------------------------------
+MAX_SHOTS = 8
+MIN_SHOT_FRAMES = 12     # shorter shots are valid but reported by shot_warnings()
+
+
+class Shot(Strict):
+    """v1.3: one camera over a contiguous range of the scene's single timeline. Cuts between
+    shots come from the shared timeline, so the set and its motion stay continuous."""
+    shot_id: Identifier
+    frame_start: Frame
+    frame_end: Frame
+    camera: Camera
+
+    @model_validator(mode="after")
+    def _range(self) -> "Shot":
+        if self.frame_end < self.frame_start:
+            raise ValueError(f"shot '{self.shot_id}': frame_end ({self.frame_end}) is before "
+                             f"frame_start ({self.frame_start})")
+        outside = [k.frame for k in self.camera.keys
+                   if not self.frame_start <= k.frame <= self.frame_end]
+        if outside:
+            raise ValueError(f"shots[{self.shot_id}].camera.keys at frames {outside} are outside "
+                             f"the shot's range {self.frame_start}-{self.frame_end}")
+        return self
+
+
+# ---------------------------------------------------------------------------
 # The SceneSpec
 # ---------------------------------------------------------------------------
 # JSON Schema form of the version-dependent rules enforced in SceneSpec._versions,
-# so the exported schema describes 1.0, 1.1 and 1.2 accurately. (Cross-field camera rules,
-# such as the 1.2 look_at/rotation conflict, are enforced by the Pydantic models only.)
+# so the exported schema describes 1.0-1.3 accurately. (Cross-field rules, such as the 1.2
+# look_at/rotation conflict and 1.3 shot-range coverage, are enforced by Pydantic only.)
 _LEGACY_CAMERA_FIELDS_NULL = {"properties": {"camera": {"properties": {
     name: {"type": "null"} for name in V12_CAMERA_FIELDS}}}}
 
@@ -360,14 +393,33 @@ _VERSION_RULES = {
             "if": {"properties": {"spec_version": {"enum": ["1.0", "1.1"]}}},
             "then": _LEGACY_CAMERA_FIELDS_NULL,
         },
+        {   # 1.0-1.2 (or omitted): one camera, required and not null; no shots
+            "if": {"properties": {"spec_version": {"enum": ["1.0", "1.1", "1.2"]}}},
+            "then": {"required": ["camera"], "properties": {"camera": {"type": "object"},
+                                                             "shots": {"type": "null"}}},
+        },
+        {   # 1.3: exactly one of camera or shots
+            "if": {"required": ["spec_version"],
+                   "properties": {"spec_version": {"const": "1.3"}}},
+            "then": {"oneOf": [
+                {"required": ["camera"], "properties": {"camera": {"type": "object"},
+                                                         "shots": {"type": "null"}}},
+                {"required": ["shots"], "properties": {"shots": {"type": "array"},
+                                                        "camera": {"type": "null"}}},
+            ]},
+        },
     ]
 }
+
+# v1.3 SceneSpec fields that are left out of serialisation when unset, so 1.0-1.2 specs dump
+# exactly as before (spec.json for Blender included).
+V13_OPTIONAL_FIELDS = ("camera", "shots")
 
 
 class SceneSpec(Strict):
     model_config = ConfigDict(extra="forbid", json_schema_extra=_VERSION_RULES)
 
-    spec_version: Literal["1.0", "1.1", "1.2"] = "1.0"   # omitted = 1.0, as before 1.1 existed
+    spec_version: Literal["1.0", "1.1", "1.2", "1.3"] = "1.0"   # omitted = 1.0
     project_id: str
     scene_id: Identifier                       # e.g. "sc03"
     shot_id: Identifier                        # e.g. "sc03_sh02"
@@ -379,7 +431,28 @@ class SceneSpec(Strict):
     characters: list[CharacterInstance] = []
     props: list[PropInstance] = []
     primitives: list[Primitive] = []                # v1.1+
-    camera: Camera
+    # Required in 1.0-1.2. In 1.3 exactly one of camera / shots (checked in _versions).
+    camera: Camera | None = None
+    shots: list[Shot] | None = Field(None, min_length=1, max_length=MAX_SHOTS)   # v1.3
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_v13(self, handler):
+        data = handler(self)
+        if isinstance(data, dict):
+            for name in V13_OPTIONAL_FIELDS:
+                if data.get(name) is None:
+                    data.pop(name, None)
+        return data
+
+    def cameras(self) -> list[tuple[str, Camera, int, int]]:
+        """(label, camera, frame_start, frame_end) for every camera in the spec: the single
+        `camera` over the whole render range, or each shot's camera over its own range."""
+        if self.shots:
+            return [(f"shots[{s.shot_id}].camera", s.camera, s.frame_start, s.frame_end)
+                    for s in self.shots]
+        if self.camera is not None:
+            return [("camera", self.camera, self.render.frame_start, self.render.frame_end)]
+        return []
 
     @model_validator(mode="after")
     def _versions(self) -> "SceneSpec":
@@ -394,21 +467,34 @@ class SceneSpec(Strict):
         elif not env.asset_id and not env.hdri_id and env.world_color is None:
             raise ValueError("environment needs an asset_id, an hdri_id or a world_color")
 
-        cam = self.camera
-        if self.spec_version in ("1.0", "1.1"):
-            used = [name for name in V12_CAMERA_FIELDS if getattr(cam, name) is not None]
-            if used:
-                raise ValueError(f"camera.{', camera.'.join(used)} require(s) spec_version 1.2")
-        else:   # 1.2: what 1.0/1.1 silently ignore is an error (see camera_warnings)
-            rotated = [k.frame for k in cam.keys if k.rotation_deg is not None]
-            if cam.look_at and rotated:
-                raise ValueError(
-                    f"camera.keys at frames {rotated} set rotation_deg, but camera.look_at "
-                    "controls rotation; remove rotation_deg or remove look_at")
-            if cam.dof_enabled and cam.focus_source() is None:
-                raise ValueError(
-                    "camera.dof_enabled needs something to focus on: set look_at, "
-                    "focus_target or focus_distance_m, or set dof_enabled to false")
+        # camera / shots form
+        if self.spec_version == "1.3":
+            if self.camera is not None and self.shots is not None:
+                raise ValueError("spec_version 1.3 takes either camera (a single shot) or "
+                                 "shots (several), not both")
+            if self.camera is None and self.shots is None:
+                raise ValueError("spec_version 1.3 needs camera (a single shot) or shots")
+        else:
+            if self.shots is not None:
+                raise ValueError("shots require spec_version 1.3")
+            if self.camera is None:
+                raise ValueError(f"camera is required for spec_version {self.spec_version}")
+
+        for label, cam, _, _ in self.cameras():
+            if self.spec_version in ("1.0", "1.1"):
+                used = [name for name in V12_CAMERA_FIELDS if getattr(cam, name) is not None]
+                if used:
+                    raise ValueError(f"camera.{', camera.'.join(used)} require(s) spec_version 1.2")
+            else:   # 1.2, 1.3: what 1.0/1.1 silently ignore is an error (see camera_warnings)
+                rotated = [k.frame for k in cam.keys if k.rotation_deg is not None]
+                if cam.look_at and rotated:
+                    raise ValueError(
+                        f"{label}.keys at frames {rotated} set rotation_deg, but {label}.look_at "
+                        "controls rotation; remove rotation_deg or remove look_at")
+                if cam.dof_enabled and cam.focus_source() is None:
+                    raise ValueError(
+                        f"{label}.dof_enabled needs something to focus on: set look_at, "
+                        "focus_target or focus_distance_m, or set dof_enabled to false")
         return self
 
     @model_validator(mode="after")
@@ -448,23 +534,42 @@ class SceneSpec(Strict):
             for k in prim.keys:
                 in_range(k.frame, f"primitives[{prim.name}].keys")
 
-        for k in self.camera.keys:
-            in_range(k.frame, "camera.keys")
-        for ref, label in ((self.camera.look_at, "look_at"),
-                           (self.camera.focus_target, "focus_target")):
-            if ref and ref not in known:
-                raise ValueError(f"camera.{label} '{ref}' is not a character, prop "
-                                 "or primitive in this shot")
+        if self.shots:
+            ids = [s.shot_id for s in self.shots]
+            dup_ids = sorted({i for i in ids if ids.count(i) > 1})
+            if dup_ids:
+                raise ValueError(f"shot_id must be unique; duplicated: {dup_ids}")
+            expected = fs
+            for s in self.shots:
+                if s.frame_start < expected:
+                    raise ValueError(f"shot '{s.shot_id}' starts at frame {s.frame_start}, "
+                                     f"overlapping or out of order (expected {expected})")
+                if s.frame_start > expected:
+                    raise ValueError(f"gap before shot '{s.shot_id}': frames {expected}-"
+                                     f"{s.frame_start - 1} are not covered by any shot")
+                expected = s.frame_end + 1
+            if expected - 1 != fe:
+                raise ValueError(f"shots end at frame {expected - 1} but render.frame_end is "
+                                 f"{fe}; shots must exactly cover {fs}-{fe}")
+
+        for label, cam, _, _ in self.cameras():
+            if self.shots is None:              # shot keys are checked against their shot
+                for k in cam.keys:
+                    in_range(k.frame, f"{label}.keys")
+            for ref, field in ((cam.look_at, "look_at"), (cam.focus_target, "focus_target")):
+                if ref and ref not in known:
+                    raise ValueError(f"{label}.{field} '{ref}' is not a character, prop "
+                                     "or primitive in this shot")
         return self
 
 
 def camera_warnings(spec: SceneSpec) -> list[str]:
     """Camera settings a valid 1.0/1.1 spec contains but the builder ignores.
 
-    1.2 rejects these cases outright, so this returns [] for 1.2 specs. Intended for the
-    build report (wired in by the builder stage), so a legacy shot's ignored data is visible.
+    1.2 and 1.3 reject these cases outright, so this returns [] for them. Merged into the
+    build report by workers/blender_job.py, so a legacy shot's ignored data is visible.
     """
-    if spec.spec_version == "1.2":
+    if spec.spec_version in ("1.2", "1.3"):
         return []
     cam, out = spec.camera, []
     rotated = [k.frame for k in cam.keys if k.rotation_deg is not None]
@@ -474,6 +579,22 @@ def camera_warnings(spec: SceneSpec) -> list[str]:
     if cam.dof_enabled and cam.focus_source() is None:
         out.append(f"camera: dof_enabled with no look_at or focus_target; fstop {cam.fstop} "
                    "is not applied and Blender's default focus is used")
+    return out
+
+
+def shot_warnings(spec: SceneSpec) -> list[str]:
+    """Advisory notes about a valid 1.3 shot list; never a validation error.
+
+    Currently: shots shorter than MIN_SHOT_FRAMES, which read as flashes and make cut
+    evidence (scene-change scores) noisy. Not yet merged into the build report: that is
+    wired in with the builder stage.
+    """
+    out = []
+    for s in spec.shots or []:
+        n = s.frame_end - s.frame_start + 1
+        if n < MIN_SHOT_FRAMES:
+            out.append(f"shot '{s.shot_id}' is {n} frame(s) long (frames {s.frame_start}-"
+                       f"{s.frame_end}); shots under {MIN_SHOT_FRAMES} frames are very short")
     return out
 
 

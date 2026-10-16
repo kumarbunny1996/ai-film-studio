@@ -12,7 +12,7 @@ import json
 import sys
 from pathlib import Path
 
-from workers.blender_job import REPO, run_shot
+from workers.blender_job import REPO, rendered_frames_problem, run_shot
 from workers.encode import encode_png_sequence, probe, verify
 
 DEFAULT_SPEC = REPO / "schemas" / "examples" / "milestone1_primitives.json"
@@ -28,6 +28,12 @@ def run(spec_path: Path, project_dir: Path, smoke: bool = False) -> dict:
     if report.get("status") != "ok" or report.get("returncode") != 0:
         raise PipelineError(f"Blender failed ({report.get('status')}, exit "
                             f"{report.get('returncode')}): {report.get('error')} — see {report['log']}")
+
+    # Decided from the report, before any file checks or FFmpeg: stale files from an earlier
+    # render can fill the gaps of a partial render, so their presence proves nothing.
+    problem = rendered_frames_problem(report)
+    if problem:
+        raise PipelineError(f"Partial (smoke) render; not encodable: {problem}")
 
     shot_id = report["shot_id"]
     start, end = report["frame_range"]

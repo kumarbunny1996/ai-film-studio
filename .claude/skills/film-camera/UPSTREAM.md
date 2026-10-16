@@ -83,3 +83,19 @@ Updated for SceneSpec v1.2 (Milestone 3, project branch `milestone3/camera`):
   portrait framing, per-key focus and path cameras still are.
 - `references/camera-reference.md`: two sentences updated for focus distance
   and subject offset.
+
+Updated for SceneSpec v1.3 (Milestone 4, project branch `milestone4/multishot-schema`):
+
+- Versions table and rules for `shots`: exactly one of `camera`/`shots`, 1–8
+  shots with unique ids, ordered contiguous ranges covering the render range,
+  per-shot camera rules with keys inside the shot, and short-shot warnings.
+- What the builder does: `CAM-<shot_id>` cameras, `CUT-<shot_id>` markers
+  bound at each shot's start, per-shot aim points `AIM-<shot_id>-<target>`,
+  `frame_set` before saving, and the `shots`/`cuts` build-report blocks.
+- Inspecting active cameras with `inspect_camera.py --camera active`, and why
+  `scene.frame_set()` is required.
+- What is not implemented (180° rule, continuity and artistic checks, per-shot
+  lighting/set changes, transitions).
+- The verified example `schemas/examples/m4_sequence.json`, with its
+  rendered cut-frame checks.
+- Multi-shot validation errors in the pitfalls table, and the v1.3 gaps.

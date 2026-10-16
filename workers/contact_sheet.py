@@ -43,7 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from workers import config
-from workers.blender_job import REPORT_INCOMPLETE
+from workers.blender_job import REPORT_INCOMPLETE, rendered_frames_problem
 
 SCHEMA = "frame_report.v1"
 REVIEW_DIR = "review"
@@ -251,6 +251,11 @@ def load_render(shot_dir: Path) -> Render:
     start, end = fr
     if start < 0 or end < start:
         raise ContactSheetError(f"invalid frame_range {fr!r}")
+    # From the report alone: stale files from an earlier render can fill a partial render's
+    # gaps, so file existence, size and age prove nothing about completeness.
+    problem = rendered_frames_problem(report)
+    if problem:
+        raise ContactSheetError(f"Partial (smoke) render; not reviewable: {problem}")
     res = report["resolution"]
     if not (isinstance(res, list) and len(res) == 2 and all(_is_int(v) and v > 0 for v in res)):
         raise ContactSheetError(f"invalid resolution {res!r}; expected [width, height]")
