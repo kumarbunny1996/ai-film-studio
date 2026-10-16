@@ -62,3 +62,24 @@ Added (project-specific, not from upstream):
 - A camera-move pattern table, a validator/builder checklist, the division
   of labour with `shot-composition` and `film-lighting`, a schema-gap note
   format and the list of known camera gaps.
+
+Updated for SceneSpec v1.2 (Milestone 3, project branch `milestone3/camera`):
+
+- A versions table; the v1.2 fields `framing.subject_offset`, `clip_start_m`,
+  `clip_end_m` and `focus_distance_m`; finite-number validation; and each
+  field marked as measured by `tests/test_camera_builder.py` or builder code
+  only.
+- Subject placement by `framing.subject_offset`. Its sign convention and
+  lens-shift formula were measured with `world_to_camera_view` for 16:9,
+  2.39:1 and square frames; portrait frames are refused. This replaces the
+  earlier advice to place subjects off-centre by changing the rotation.
+- An explicit depth-of-field strategy table with the v1.2 focus rules, a
+  clipping section, and legacy 1.0/1.1 behaviour with the build-report
+  warnings the worker adds.
+- The verified example `schemas/examples/m3_framing.json`, and a pointer to
+  contact-sheet review as evidence that still needs human approval.
+- Known gaps updated: aim offset, clipping and focus distance are no longer
+  gaps; roll with `look_at`, non-perspective projection, sensor control,
+  portrait framing, per-key focus and path cameras still are.
+- `references/camera-reference.md`: two sentences updated for focus distance
+  and subject offset.

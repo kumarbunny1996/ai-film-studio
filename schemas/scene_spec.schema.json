@@ -115,6 +115,59 @@
           "minimum": 0,
           "title": "Handheld Shake",
           "type": "number"
+        },
+        "framing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Framing"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "clip_start_m": {
+          "anyOf": [
+            {
+              "maximum": 10,
+              "minimum": 0.001,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip Start M"
+        },
+        "clip_end_m": {
+          "anyOf": [
+            {
+              "maximum": 100000,
+              "minimum": 1,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Clip End M"
+        },
+        "focus_distance_m": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 0.05,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Distance M"
         }
       },
       "required": [
@@ -315,6 +368,28 @@
         }
       },
       "title": "Environment",
+      "type": "object"
+    },
+    "Framing": {
+      "additionalProperties": false,
+      "description": "v1.2. Where the look_at aim point sits in frame, as a fraction of the frame from its\ncentre: [x, y], +x right, +y up. [-1/6, 0] puts it on the left third line.",
+      "properties": {
+        "subject_offset": {
+          "items": {
+            "maximum": 0.4,
+            "minimum": -0.4,
+            "type": "number"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "title": "Subject Offset",
+          "type": "array"
+        }
+      },
+      "required": [
+        "subject_offset"
+      ],
+      "title": "Framing",
       "type": "object"
     },
     "Lighting": {
@@ -896,6 +971,38 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "spec_version": {
+            "enum": [
+              "1.0",
+              "1.1"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "camera": {
+            "properties": {
+              "framing": {
+                "type": "null"
+              },
+              "clip_start_m": {
+                "type": "null"
+              },
+              "clip_end_m": {
+                "type": "null"
+              },
+              "focus_distance_m": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "properties": {
@@ -903,7 +1010,8 @@
       "default": "1.0",
       "enum": [
         "1.0",
-        "1.1"
+        "1.1",
+        "1.2"
       ],
       "title": "Spec Version",
       "type": "string"

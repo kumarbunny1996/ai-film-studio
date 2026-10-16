@@ -832,3 +832,24 @@ def test_cli_failures_exit_1_with_diagnostics_and_no_results(tmp_path, capsys, b
     assert captured.out == ""                         # no success JSON on failure
     assert captured.err.startswith("FAILED: ") and expected in captured.err
     assert_no_results(shot)
+
+
+# --- M2: an incompletely rewritten build report is never accepted -------------------
+@needs_ffmpeg
+def test_shot_marked_incomplete_is_refused_even_though_the_report_says_ok(tmp_path):
+    from workers.blender_job import REPORT_INCOMPLETE
+    shot = make_shot(tmp_path, count=4)               # valid frames, report status "ok"
+    (shot / REPORT_INCOMPLETE).write_text("camera warning rewrite in progress")
+    _expect_rejected(shot, "rewrite of build_report.json failed or was interrupted")
+
+
+@needs_ffmpeg
+def test_incomplete_marker_with_force_removes_old_evidence_and_refuses(tmp_path, capsys):
+    from workers.blender_job import REPORT_INCOMPLETE
+    shot = make_shot(tmp_path, count=4)
+    assert main(["--shot-dir", str(shot)]) == 0               # evidence from a good build
+    capsys.readouterr()
+    (shot / REPORT_INCOMPLETE).write_text("rewrite failed")
+    assert main(["--shot-dir", str(shot), "--force"]) == 1
+    assert "failed or was interrupted" in capsys.readouterr().err
+    assert_no_results(shot)

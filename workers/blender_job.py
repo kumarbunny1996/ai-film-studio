@@ -6,14 +6,22 @@ Usage from an arq/RQ job:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
-from apps.api.schemas.scene_spec import AssetManifest, SceneSpec, validate_against_manifest
+from apps.api.schemas.scene_spec import (AssetManifest, SceneSpec, camera_warnings,
+                                         validate_against_manifest)
 from workers import config
 
 REPO = Path(__file__).resolve().parents[1]
 ASSETS = REPO / "assets"
+
+# Written next to build_report.json while the worker rewrites it; removed only once the
+# rewrite has fully succeeded. While it exists, the on-disk report must not be trusted
+# (workers/contact_sheet.py refuses the shot).
+REPORT_INCOMPLETE = "build_report.json.incomplete"
+REPORT_TMP = "build_report.json.tmp"
 
 
 class SpecRejected(ValueError):
@@ -55,13 +63,86 @@ def run_shot(spec_dict: dict, project_dir: Path, render: bool = True, smoke: boo
         cmd.append("--smoke")
 
     report_path = shot_dir / "build_report.json"
-    report_path.unlink(missing_ok=True)    # never mistake a previous run's report for this one
+    # never mistake a previous run's report (or its unfinished rewrite) for this one
+    for stale in (report_path, shot_dir / REPORT_INCOMPLETE, shot_dir / REPORT_TMP):
+        stale.unlink(missing_ok=True)
     log_path = shot_dir / "blender.log"
     with log_path.open("w") as log:
         proc = subprocess.run(cmd, stdout=log, stderr=subprocess.STDOUT,
                               timeout=config.BLENDER_TIMEOUT_S)
 
-    report = json.loads(report_path.read_text()) if report_path.exists() else {
-        "status": "crash", "error": f"Blender exited {proc.returncode} without a report"}
+    report = _read_report(report_path, proc.returncode)
+    if report.get("status") == "ok" and proc.returncode == 0:
+        report = _merge_camera_warnings(report, report_path, spec)
     report["returncode"], report["log"] = proc.returncode, str(log_path)
     return report
+
+
+def _read_report(report_path: Path, returncode: int) -> dict:
+    if not report_path.exists():
+        return {"status": "crash", "error": f"Blender exited {returncode} without a report"}
+    try:
+        report = json.loads(report_path.read_text())
+    except (OSError, ValueError) as e:
+        return {"status": "crash", "error": f"unreadable {report_path.name}: {e}"}
+    if not isinstance(report, dict):
+        return {"status": "crash", "error": f"{report_path.name} is not a JSON object"}
+    return report
+
+
+def _merge_camera_warnings(report: dict, report_path: Path, spec: SceneSpec) -> dict:
+    """Add camera_warnings() for settings a 1.0/1.1 spec contains but the builder ignores.
+
+    Blender's Python has no pydantic, so the rules live only in the schema module and are
+    applied here, after a successful build. The merged report is written back to disk so
+    build_report.json stays the single record of the build.
+
+    Write-ahead protocol, so a failed or interrupted rewrite can never leave a report that
+    looks complete:
+      1. create REPORT_INCOMPLETE next to the report;
+      2. write the merged report to REPORT_TMP, flush it, then os.replace() it over the
+         original (atomic on one volume: the old or the new report, never a truncated one);
+      3. remove REPORT_INCOMPLETE only after the replace succeeded.
+    Any failure returns status "report_error" and leaves the marker in place. A file held
+    open by another process blocks both replacing and renaming on Windows, but not creating
+    the marker. If the marker itself can't be created, the report is left untouched and the
+    error says it may still read "ok".
+    """
+    new = [w for w in camera_warnings(spec) if w not in report.get("warnings", [])]
+    if not new:
+        return report
+    merged = {**report, "warnings": list(report.get("warnings", [])) + new}
+    marker, tmp = report_path.with_name(REPORT_INCOMPLETE), report_path.with_name(REPORT_TMP)
+    failed = {**merged, "status": "report_error"}
+
+    try:
+        marker.write_text(json.dumps({"reason": "camera warning rewrite in progress",
+                                      "report": report_path.name}, indent=2))
+    except OSError as e:
+        return {**failed, "error": f"could not write camera warnings to {report_path}: cannot "
+                                   f"create {marker.name} ({e}); the on-disk report was left "
+                                   "unchanged and may still read status 'ok' without them"}
+    try:
+        _write_durably(tmp, json.dumps(merged, indent=2))
+        os.replace(tmp, report_path)
+    except OSError as e:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return {**failed, "error": f"could not write camera warnings to {report_path}: {e}; "
+                                   f"{marker.name} marks the on-disk report as incomplete"}
+    try:
+        marker.unlink()
+    except OSError as e:
+        return {**failed, "error": f"camera warnings were written to {report_path}, but "
+                                   f"{marker.name} could not be removed ({e}); the shot stays "
+                                   "marked incomplete"}
+    return merged
+
+
+def _write_durably(path: Path, text: str) -> None:
+    with open(path, "w") as f:           # same default encoding as Path.write_text
+        f.write(text)
+        f.flush()
+        os.fsync(f.fileno())

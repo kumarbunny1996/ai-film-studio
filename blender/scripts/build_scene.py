@@ -39,7 +39,7 @@ import bmesh
 import bpy
 from mathutils import Euler
 
-SUPPORTED_SPECS = ("1.0", "1.1")
+SUPPORTED_SPECS = ("1.0", "1.1", "1.2")
 SHOT_COLLECTION = "SHOT"
 SMOKE_FRAMES = 8
 
@@ -471,7 +471,24 @@ def aim_target(name: str, roots: dict, height: float, shot_coll) -> bpy.types.Ob
     return aim
 
 
-def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> None:
+def framing_shift(offset: list[float], width: int, height: int) -> tuple[float, float]:
+    """Lens shift that puts the tracked aim point at `offset` from frame centre.
+
+    offset = [x, y] as fractions of the frame (+x right, +y up). With sensor_fit AUTO a
+    landscape frame measures shift in units of its width, so the vertical shift is scaled by
+    height/width. Verified with world_to_camera_view (tests/test_camera_builder.py) for
+    landscape and square frames only; portrait frames are refused by the caller.
+    """
+    x, y = offset
+    return -x + 0.0, -y * height / width + 0.0        # + 0.0 turns -0.0 into 0.0
+
+
+def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> dict:
+    """Build CAM-shot from a validated camera spec; return its effective settings.
+
+    v1.2 fields (framing, clip_start_m, clip_end_m, focus_distance_m) change nothing when
+    absent, so 1.0/1.1 cameras are built exactly as before.
+    """
     data = bpy.data.cameras.new("CAM-shot")
     data.lens = cam_spec.get("lens_mm", 35)
     data.sensor_width = 36
@@ -513,9 +530,42 @@ def setup_camera(scene, shot_coll, cam_spec: dict, roots: dict, seed: int) -> No
 
     data.dof.use_dof = cam_spec.get("dof_enabled", True)
     focus = cam_spec.get("focus_target") or look_at
+    focus_distance = cam_spec.get("focus_distance_m")
     if data.dof.use_dof and focus:
         data.dof.focus_object = aim_target(focus, roots, height, shot_coll)
         data.dof.aperture_fstop = cam_spec.get("fstop", 2.8)
+    elif data.dof.use_dof and focus_distance is not None:          # v1.2
+        data.dof.focus_distance = focus_distance
+        data.dof.aperture_fstop = cam_spec.get("fstop", 2.8)
+
+    # --- v1.2 framing and clipping ---
+    offset = (cam_spec.get("framing") or {}).get("subject_offset")
+    if offset is not None:
+        w, h = scene.render.resolution_x, scene.render.resolution_y
+        if h > w:
+            raise BuildError(f"camera.framing.subject_offset is only supported for landscape "
+                             f"or square frames; render.resolution is {w}x{h}")
+        data.shift_x, data.shift_y = framing_shift(offset, w, h)
+    if cam_spec.get("clip_start_m") is not None:
+        data.clip_start = cam_spec["clip_start_m"]
+    if cam_spec.get("clip_end_m") is not None:
+        data.clip_end = cam_spec["clip_end_m"]
+
+    return {
+        "type": data.type, "sensor_width": data.sensor_width, "sensor_fit": data.sensor_fit,
+        "lens_mm": round(cam_spec.get("lens_mm", 35), 6),
+        "lens_animated": any(k.get("lens_mm") for k in cam_spec["keys"]),
+        "look_at": look_at, "look_at_height": height if look_at else None,
+        "subject_offset": list(offset) if offset is not None else None,
+        "shift": [round(data.shift_x, 6), round(data.shift_y, 6)],
+        "clip": [round(data.clip_start, 6), round(data.clip_end, 6)],
+        "dof": {"enabled": data.dof.use_dof,
+                "focus_object": data.dof.focus_object.name if data.dof.focus_object else None,
+                "focus_distance_m": (round(data.dof.focus_distance, 6)
+                                     if data.dof.use_dof and not data.dof.focus_object else None),
+                "fstop": round(data.dof.aperture_fstop, 6) if data.dof.use_dof else None},
+        "handheld_shake": shake,
+    }
 
 
 def setup_render(scene, r: dict, shot_id: str, out: Path) -> None:
@@ -638,7 +688,7 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     roots.update(build_primitives(spec.get("primitives", []), shot_coll, report))
     report.lap("primitives")
 
-    setup_camera(scene, shot_coll, spec["camera"], roots, seed)
+    report.data["camera"] = setup_camera(scene, shot_coll, spec["camera"], roots, seed)
     report.lap("camera")
 
     out.mkdir(parents=True, exist_ok=True)

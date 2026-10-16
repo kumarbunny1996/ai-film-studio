@@ -12,15 +12,22 @@ Versions:
   1.0  asset-based shots (characters, props, environment, HDRI).
   1.1  adds procedural `primitives` and `environment.world_color`, and allows a
        shot without environment assets. Every valid 1.0 spec is still valid.
+  1.2  adds optional camera controls: `framing.subject_offset`, `clip_start_m`,
+       `clip_end_m`, `focus_distance_m`. In 1.2 only, `rotation_deg` together with
+       `look_at`, and depth of field with nothing to focus on, are errors; 1.0/1.1 keep
+       accepting them (see camera_warnings()). Every valid 1.1 spec is still valid as 1.1.
+
+All versions: camera numbers must be finite (NaN and +/-inf are rejected).
 """
 from __future__ import annotations
 
 from enum import Enum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, field_validator, model_serializer,
+                      model_validator)
 
-SPEC_VERSION = "1.1"                           # latest; "1.0" is still accepted
+SPEC_VERSION = "1.2"                           # latest; "1.0" and "1.1" are still accepted
 
 # ---------------------------------------------------------------------------
 # Primitives
@@ -224,14 +231,35 @@ class ShotSize(str, Enum):
 
 
 class CameraKey(Strict):
+    model_config = ConfigDict(allow_inf_nan=False)   # all versions: finite numbers only
+
     frame: Frame
     location: Vec3
-    rotation_deg: Vec3 | None = None           # ignored when camera.look_at is set
+    rotation_deg: Vec3 | None = None           # ignored when camera.look_at is set (1.0/1.1)
     lens_mm: float | None = Field(None, ge=8, le=300)  # animate focal length (zoom)
     easing: Easing = Easing.ease_in_out
 
 
+SubjectOffset = Annotated[list[Annotated[float, Field(ge=-0.4, le=0.4)]],
+                          Field(min_length=2, max_length=2)]
+
+
+class Framing(Strict):
+    """v1.2. Where the look_at aim point sits in frame, as a fraction of the frame from its
+    centre: [x, y], +x right, +y up. [-1/6, 0] puts it on the left third line."""
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    subject_offset: SubjectOffset
+
+
+# Optional v1.2 camera fields. Unset, they are left out of serialisation entirely, so valid
+# 1.0/1.1 specs dump exactly as before (and spec.json for Blender is unchanged).
+V12_CAMERA_FIELDS = ("framing", "clip_start_m", "clip_end_m", "focus_distance_m")
+
+
 class Camera(Strict):
+    model_config = ConfigDict(allow_inf_nan=False)   # all versions: finite numbers only
+
     shot_size: ShotSize = ShotSize.medium      # informational; used by planners/QA
     lens_mm: float = Field(35, ge=8, le=300)
     look_at: Identifier | None = None          # character/prop (or v1.1 primitive) to track
@@ -241,6 +269,26 @@ class Camera(Strict):
     focus_target: Identifier | None = None     # defaults to look_at
     fstop: float = Field(2.8, ge=0.5, le=32)
     handheld_shake: float = Field(0.0, ge=0, le=1)
+    # --- v1.2 (rejected in 1.0/1.1 by SceneSpec._versions) ---
+    framing: Framing | None = None             # needs look_at
+    clip_start_m: float | None = Field(None, ge=0.001, le=10)       # Blender default 0.1
+    clip_end_m: float | None = Field(None, ge=1, le=100_000)        # Blender default 1000
+    focus_distance_m: float | None = Field(None, ge=0.05, le=10_000)  # DoF with no target
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_v12(self, handler):
+        data = handler(self)
+        if isinstance(data, dict):
+            for name in V12_CAMERA_FIELDS:
+                if data.get(name) is None:
+                    data.pop(name, None)
+        return data
+
+    def focus_source(self) -> str | None:
+        """What depth of field focuses on: an object name, "distance", or None."""
+        if self.focus_target or self.look_at:
+            return self.focus_target or self.look_at
+        return "distance" if self.focus_distance_m is not None else None
 
     @field_validator("keys")
     @classmethod
@@ -256,12 +304,35 @@ class Camera(Strict):
             raise ValueError("camera keys need rotation_deg when camera.look_at is not set")
         return self
 
+    @model_validator(mode="after")
+    def _v12_fields(self) -> "Camera":
+        # Version-independent sanity of the 1.2 fields; whether they are allowed at all is
+        # decided by SceneSpec._versions.
+        if self.framing is not None and self.look_at is None:
+            raise ValueError("camera.framing.subject_offset needs camera.look_at "
+                             "(it places the tracked subject in frame)")
+        if (self.clip_start_m is not None and self.clip_end_m is not None
+                and self.clip_start_m >= self.clip_end_m):
+            raise ValueError(f"camera.clip_start_m ({self.clip_start_m}) must be less than "
+                             f"camera.clip_end_m ({self.clip_end_m})")
+        if self.focus_distance_m is not None:
+            if not self.dof_enabled:
+                raise ValueError("camera.focus_distance_m needs camera.dof_enabled")
+            if self.focus_target or self.look_at:
+                raise ValueError("camera.focus_distance_m is only for depth of field without "
+                                 "a focus object; remove it or remove focus_target/look_at")
+        return self
+
 
 # ---------------------------------------------------------------------------
 # The SceneSpec
 # ---------------------------------------------------------------------------
 # JSON Schema form of the version-dependent rules enforced in SceneSpec._versions,
-# so the exported schema describes both 1.0 and 1.1 accurately.
+# so the exported schema describes 1.0, 1.1 and 1.2 accurately. (Cross-field camera rules,
+# such as the 1.2 look_at/rotation conflict, are enforced by the Pydantic models only.)
+_LEGACY_CAMERA_FIELDS_NULL = {"properties": {"camera": {"properties": {
+    name: {"type": "null"} for name in V12_CAMERA_FIELDS}}}}
+
 _VERSION_RULES = {
     "allOf": [
         {
@@ -289,7 +360,11 @@ _VERSION_RULES = {
                     },
                 },
             },
-        }
+        },
+        {   # v1.2 camera fields; an omitted spec_version means 1.0, which this also covers
+            "if": {"properties": {"spec_version": {"enum": ["1.0", "1.1"]}}},
+            "then": _LEGACY_CAMERA_FIELDS_NULL,
+        },
     ]
 }
 
@@ -297,7 +372,7 @@ _VERSION_RULES = {
 class SceneSpec(Strict):
     model_config = ConfigDict(extra="forbid", json_schema_extra=_VERSION_RULES)
 
-    spec_version: Literal["1.0", "1.1"] = "1.0"   # omitted = 1.0, as before 1.1 existed
+    spec_version: Literal["1.0", "1.1", "1.2"] = "1.0"   # omitted = 1.0, as before 1.1 existed
     project_id: str
     scene_id: Identifier                       # e.g. "sc03"
     shot_id: Identifier                        # e.g. "sc03_sh02"
@@ -323,6 +398,22 @@ class SceneSpec(Strict):
                 raise ValueError("environment needs at least an asset_id or an hdri_id")
         elif not env.asset_id and not env.hdri_id and env.world_color is None:
             raise ValueError("environment needs an asset_id, an hdri_id or a world_color")
+
+        cam = self.camera
+        if self.spec_version in ("1.0", "1.1"):
+            used = [name for name in V12_CAMERA_FIELDS if getattr(cam, name) is not None]
+            if used:
+                raise ValueError(f"camera.{', camera.'.join(used)} require(s) spec_version 1.2")
+        else:   # 1.2: what 1.0/1.1 silently ignore is an error (see camera_warnings)
+            rotated = [k.frame for k in cam.keys if k.rotation_deg is not None]
+            if cam.look_at and rotated:
+                raise ValueError(
+                    f"camera.keys at frames {rotated} set rotation_deg, but camera.look_at "
+                    "controls rotation; remove rotation_deg or remove look_at")
+            if cam.dof_enabled and cam.focus_source() is None:
+                raise ValueError(
+                    "camera.dof_enabled needs something to focus on: set look_at, "
+                    "focus_target or focus_distance_m, or set dof_enabled to false")
         return self
 
     @model_validator(mode="after")
@@ -370,6 +461,25 @@ class SceneSpec(Strict):
                 raise ValueError(f"camera.{label} '{ref}' is not a character, prop "
                                  "or primitive in this shot")
         return self
+
+
+def camera_warnings(spec: SceneSpec) -> list[str]:
+    """Camera settings a valid 1.0/1.1 spec contains but the builder ignores.
+
+    1.2 rejects these cases outright, so this returns [] for 1.2 specs. Intended for the
+    build report (wired in by the builder stage), so a legacy shot's ignored data is visible.
+    """
+    if spec.spec_version == "1.2":
+        return []
+    cam, out = spec.camera, []
+    rotated = [k.frame for k in cam.keys if k.rotation_deg is not None]
+    if cam.look_at and rotated:
+        out.append(f"camera: rotation_deg on keys at frames {rotated} is ignored because "
+                   f"look_at '{cam.look_at}' controls rotation")
+    if cam.dof_enabled and cam.focus_source() is None:
+        out.append(f"camera: dof_enabled with no look_at or focus_target; fstop {cam.fstop} "
+                   "is not applied and Blender's default focus is used")
+    return out
 
 
 # ---------------------------------------------------------------------------

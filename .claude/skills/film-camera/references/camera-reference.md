@@ -18,7 +18,8 @@ from a validated spec.
   landscape renders.
 - **Aperture (f-stop):** lower numbers give shallower depth of field.
 - **Focus object / distance:** what is tack-sharp. The schema supports a focus
-  object only.
+  object in every version, and a focus distance (`focus_distance_m`, used
+  only without a focus object) from v1.2.
 
 ## Focal length and field of view
 
@@ -51,8 +52,9 @@ framing a landscape shot.
 ## Composition rules worth knowing
 
 1. **Rule of thirds:** put the subject on a third-line intersection, not dead
-   centre. Note that `camera.look_at` always centres its aim point; see
-   film-camera for the options.
+   centre. `camera.look_at` centres its aim point unless v1.2
+   `framing.subject_offset` is set (landscape and square frames only); see
+   film-camera.
 2. **Leading lines:** roads, walls, edges and light beams lead the eye to the
    subject. Arrange set primitives and props to provide them.
 3. **Headroom and nose room:** leave space above the head (about 10% of

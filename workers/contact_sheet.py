@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from workers import config
+from workers.blender_job import REPORT_INCOMPLETE
 
 SCHEMA = "frame_report.v1"
 REVIEW_DIR = "review"
@@ -217,6 +218,11 @@ def load_render(shot_dir: Path) -> Render:
         raise ContactSheetError(f"shot directory not found: {shot_dir}")
     shot_dir = shot_dir.resolve(strict=True)
     report_path = shot_dir / "build_report.json"
+    marker = shot_dir / REPORT_INCOMPLETE
+    if marker.exists():
+        raise ContactSheetError(f"{marker} exists: the worker's rewrite of build_report.json "
+                                "failed or was interrupted, so the report may be stale or "
+                                "incomplete; re-run the build")
     if not report_path.is_file():
         raise ContactSheetError(f"{report_path} not found; the render did not complete "
                                 "(PNG files alone are not evidence of a successful render)")
