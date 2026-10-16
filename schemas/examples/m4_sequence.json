@@ -35,7 +35,7 @@
      "camera": {"shot_size": "medium", "lens_mm": 50, "look_at": "hero", "look_at_height": 0.0,
                 "dof_enabled": true, "fstop": 4.0,
                 "keys": [{"frame": 49, "location": [-2.0, -6.0, 1.4], "easing": "linear"},
-                         {"frame": 96, "location": [1.5, -6.0, 1.4]}]}},
+                         {"frame": 96, "location": [0.5, -6.0, 1.4]}]}},
     {"shot_id": "sh03_close", "frame_start": 97, "frame_end": 132,
      "camera": {"shot_size": "close_up", "lens_mm": 85, "look_at": "hero", "look_at_height": 0.0,
                 "framing": {"subject_offset": [-0.1667, 0.0]},
