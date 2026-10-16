@@ -1,0 +1,28 @@
+{
+  "assets": [
+    {"id": "shepherd_girl", "type": "character", "file": "characters/shepherd_girl.blend",
+     "collection": "CH-shepherd_girl", "armature": "RIG-shepherd_girl", "rig_type": "rigify_human",
+     "bones": ["DEF-hand.R", "DEF-hand.L", "DEF-spine.003"], "license": "own"},
+    {"id": "sheepdog", "type": "character", "file": "characters/sheepdog.blend",
+     "collection": "CH-sheepdog", "armature": "RIG-sheepdog", "rig_type": "quadruped_v1",
+     "bones": ["DEF-head"], "license": "own"},
+    {"id": "walking_staff", "type": "prop", "file": "props/walking_staff.blend",
+     "collection": "PR-walking_staff", "license": "own"},
+    {"id": "alpine_meadow", "type": "environment", "file": "environments/alpine_meadow.blend",
+     "collection": "ENV-alpine_meadow", "license": "own"},
+    {"id": "sky_golden_hour", "type": "hdri", "file": "hdri/kloofendal_43d_clear_4k.exr",
+     "license": "CC0 (Poly Haven)"}
+  ],
+  "actions": [
+    {"id": "idle_breathe", "file": "actions/human_actions.blend", "action_name": "human_idle_breathe",
+     "rig_type": "rigify_human", "frames": 96, "loopable": true},
+    {"id": "walk_cycle", "file": "actions/human_actions.blend", "action_name": "human_walk",
+     "rig_type": "rigify_human", "frames": 32, "loopable": true},
+    {"id": "look_around", "file": "actions/human_actions.blend", "action_name": "human_look_around",
+     "rig_type": "rigify_human", "frames": 72, "loopable": false},
+    {"id": "dog_idle", "file": "actions/quadruped_actions.blend", "action_name": "dog_idle",
+     "rig_type": "quadruped_v1", "frames": 60, "loopable": true},
+    {"id": "dog_trot", "file": "actions/quadruped_actions.blend", "action_name": "dog_trot",
+     "rig_type": "quadruped_v1", "frames": 20, "loopable": true}
+  ]
+}

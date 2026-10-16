@@ -1,0 +1,708 @@
+{
+  "$defs": {
+    "ActionClip": {
+      "additionalProperties": false,
+      "description": "An action from the action library placed on the NLA timeline.",
+      "properties": {
+        "action_id": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Action Id",
+          "type": "string"
+        },
+        "start_frame": {
+          "minimum": 1,
+          "title": "Start Frame",
+          "type": "integer"
+        },
+        "end_frame": {
+          "minimum": 1,
+          "title": "End Frame",
+          "type": "integer"
+        },
+        "speed": {
+          "default": 1.0,
+          "exclusiveMinimum": 0.1,
+          "maximum": 4,
+          "title": "Speed",
+          "type": "number"
+        },
+        "blend_in": {
+          "default": 6,
+          "maximum": 48,
+          "minimum": 0,
+          "title": "Blend In",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "action_id",
+        "start_frame",
+        "end_frame"
+      ],
+      "title": "ActionClip",
+      "type": "object"
+    },
+    "Camera": {
+      "additionalProperties": false,
+      "properties": {
+        "shot_size": {
+          "$ref": "#/$defs/ShotSize",
+          "default": "medium"
+        },
+        "lens_mm": {
+          "default": 35,
+          "maximum": 300,
+          "minimum": 8,
+          "title": "Lens Mm",
+          "type": "number"
+        },
+        "look_at": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{1,47}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Look At"
+        },
+        "look_at_height": {
+          "default": 1.3,
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Look At Height",
+          "type": "number"
+        },
+        "keys": {
+          "items": {
+            "$ref": "#/$defs/CameraKey"
+          },
+          "minItems": 1,
+          "title": "Keys",
+          "type": "array"
+        },
+        "dof_enabled": {
+          "default": true,
+          "title": "Dof Enabled",
+          "type": "boolean"
+        },
+        "focus_target": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{1,47}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Focus Target"
+        },
+        "fstop": {
+          "default": 2.8,
+          "maximum": 32,
+          "minimum": 0.5,
+          "title": "Fstop",
+          "type": "number"
+        },
+        "handheld_shake": {
+          "default": 0.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Handheld Shake",
+          "type": "number"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "title": "Camera",
+      "type": "object"
+    },
+    "CameraKey": {
+      "additionalProperties": false,
+      "properties": {
+        "frame": {
+          "minimum": 1,
+          "title": "Frame",
+          "type": "integer"
+        },
+        "location": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Location",
+          "type": "array"
+        },
+        "rotation_deg": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Deg"
+        },
+        "lens_mm": {
+          "anyOf": [
+            {
+              "maximum": 300,
+              "minimum": 8,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Lens Mm"
+        },
+        "easing": {
+          "$ref": "#/$defs/Easing",
+          "default": "ease_in_out"
+        }
+      },
+      "required": [
+        "frame",
+        "location"
+      ],
+      "title": "CameraKey",
+      "type": "object"
+    },
+    "CharacterInstance": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "asset_id": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform",
+          "default": {
+            "location": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation_deg": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": 1.0
+          }
+        },
+        "motion_path": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TransformKey"
+          },
+          "title": "Motion Path",
+          "type": "array"
+        },
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/ActionClip"
+          },
+          "minItems": 1,
+          "title": "Actions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "asset_id",
+        "actions"
+      ],
+      "title": "CharacterInstance",
+      "type": "object"
+    },
+    "Easing": {
+      "enum": [
+        "linear",
+        "ease_in_out",
+        "constant"
+      ],
+      "title": "Easing",
+      "type": "string"
+    },
+    "Environment": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{1,47}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Asset Id"
+        },
+        "hdri_id": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{1,47}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hdri Id"
+        },
+        "hdri_strength": {
+          "default": 1.0,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Hdri Strength",
+          "type": "number"
+        },
+        "hdri_rotation_deg": {
+          "default": 0.0,
+          "title": "Hdri Rotation Deg",
+          "type": "number"
+        },
+        "fog_density": {
+          "default": 0.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Fog Density",
+          "type": "number"
+        }
+      },
+      "title": "Environment",
+      "type": "object"
+    },
+    "Lighting": {
+      "additionalProperties": false,
+      "properties": {
+        "preset": {
+          "$ref": "#/$defs/LightingPreset",
+          "default": "golden_hour"
+        },
+        "sun_elevation_deg": {
+          "anyOf": [
+            {
+              "maximum": 90,
+              "minimum": -10,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sun Elevation Deg"
+        },
+        "sun_azimuth_deg": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 360,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sun Azimuth Deg"
+        },
+        "sun_strength": {
+          "anyOf": [
+            {
+              "maximum": 20,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sun Strength"
+        },
+        "exposure": {
+          "default": 0.0,
+          "maximum": 5,
+          "minimum": -5,
+          "title": "Exposure",
+          "type": "number"
+        }
+      },
+      "title": "Lighting",
+      "type": "object"
+    },
+    "LightingPreset": {
+      "enum": [
+        "golden_hour",
+        "overcast",
+        "midday",
+        "blue_hour",
+        "night"
+      ],
+      "title": "LightingPreset",
+      "type": "string"
+    },
+    "PropInstance": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "asset_id": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Asset Id",
+          "type": "string"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform",
+          "default": {
+            "location": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation_deg": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": 1.0
+          }
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9_]{1,47}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent"
+        },
+        "parent_bone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Parent Bone"
+        }
+      },
+      "required": [
+        "name",
+        "asset_id"
+      ],
+      "title": "PropInstance",
+      "type": "object"
+    },
+    "RenderQuality": {
+      "enum": [
+        "animatic",
+        "final"
+      ],
+      "title": "RenderQuality",
+      "type": "string"
+    },
+    "RenderSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "quality": {
+          "$ref": "#/$defs/RenderQuality",
+          "default": "animatic"
+        },
+        "engine": {
+          "default": "eevee",
+          "enum": [
+            "eevee",
+            "cycles"
+          ],
+          "title": "Engine",
+          "type": "string"
+        },
+        "resolution": {
+          "default": [
+            1920,
+            1080
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Resolution",
+          "type": "array"
+        },
+        "fps": {
+          "default": 24,
+          "enum": [
+            24,
+            25,
+            30
+          ],
+          "title": "Fps",
+          "type": "integer"
+        },
+        "frame_start": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Frame Start",
+          "type": "integer"
+        },
+        "frame_end": {
+          "default": 120,
+          "minimum": 1,
+          "title": "Frame End",
+          "type": "integer"
+        },
+        "samples": {
+          "default": 64,
+          "maximum": 4096,
+          "minimum": 1,
+          "title": "Samples",
+          "type": "integer"
+        },
+        "motion_blur": {
+          "default": true,
+          "title": "Motion Blur",
+          "type": "boolean"
+        },
+        "seed": {
+          "default": 0,
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "title": "RenderSettings",
+      "type": "object"
+    },
+    "ShotSize": {
+      "enum": [
+        "extreme_wide",
+        "wide",
+        "medium",
+        "close_up",
+        "extreme_close_up"
+      ],
+      "title": "ShotSize",
+      "type": "string"
+    },
+    "Transform": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Location",
+          "type": "array"
+        },
+        "rotation_deg": {
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Rotation Deg",
+          "type": "array"
+        },
+        "scale": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "title": "Scale",
+          "type": "number"
+        }
+      },
+      "title": "Transform",
+      "type": "object"
+    },
+    "TransformKey": {
+      "additionalProperties": false,
+      "description": "A keyframe on an object's root (used for travel across the set).",
+      "properties": {
+        "frame": {
+          "minimum": 1,
+          "title": "Frame",
+          "type": "integer"
+        },
+        "location": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Location",
+          "type": "array"
+        },
+        "rotation_z_deg": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Z Deg"
+        },
+        "easing": {
+          "$ref": "#/$defs/Easing",
+          "default": "ease_in_out"
+        }
+      },
+      "required": [
+        "frame",
+        "location"
+      ],
+      "title": "TransformKey",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "spec_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Spec Version",
+      "type": "string"
+    },
+    "project_id": {
+      "title": "Project Id",
+      "type": "string"
+    },
+    "scene_id": {
+      "pattern": "^[a-z][a-z0-9_]{1,47}$",
+      "title": "Scene Id",
+      "type": "string"
+    },
+    "shot_id": {
+      "pattern": "^[a-z][a-z0-9_]{1,47}$",
+      "title": "Shot Id",
+      "type": "string"
+    },
+    "description": {
+      "maxLength": 600,
+      "title": "Description",
+      "type": "string"
+    },
+    "style_template": {
+      "default": "spring_style",
+      "pattern": "^[a-z][a-z0-9_]{1,47}$",
+      "title": "Style Template",
+      "type": "string"
+    },
+    "render": {
+      "$ref": "#/$defs/RenderSettings",
+      "default": {
+        "quality": "animatic",
+        "engine": "eevee",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "fps": 24,
+        "frame_start": 1,
+        "frame_end": 120,
+        "samples": 64,
+        "motion_blur": true,
+        "seed": 0
+      }
+    },
+    "environment": {
+      "$ref": "#/$defs/Environment"
+    },
+    "lighting": {
+      "$ref": "#/$defs/Lighting",
+      "default": {
+        "preset": "golden_hour",
+        "sun_elevation_deg": null,
+        "sun_azimuth_deg": null,
+        "sun_strength": null,
+        "exposure": 0.0
+      }
+    },
+    "characters": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CharacterInstance"
+      },
+      "title": "Characters",
+      "type": "array"
+    },
+    "props": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/PropInstance"
+      },
+      "title": "Props",
+      "type": "array"
+    },
+    "camera": {
+      "$ref": "#/$defs/Camera"
+    }
+  },
+  "required": [
+    "project_id",
+    "scene_id",
+    "shot_id",
+    "description",
+    "environment",
+    "camera"
+  ],
+  "title": "SceneSpec",
+  "type": "object"
+}

@@ -1,0 +1,20 @@
+[project]
+name = "ai-film-studio"
+version = "0.1.0"
+description = "Story-to-3D-film pipeline: LLMs plan, validated JSON describes, Blender executes."
+requires-python = ">=3.13,<3.14"
+dependencies = ["pydantic>=2.9,<3"]
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[tool.uv]
+package = false            # an application, not an installable library
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]         # lets tests import apps.* and workers.*
+markers = [
+  "blender: runs headless Blender (slow)",
+  "render: full 96-frame render + MP4 encode (very slow)",
+]

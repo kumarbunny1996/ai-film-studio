@@ -1,0 +1,46 @@
+{
+  "spec_version": "1.0",
+  "project_id": "demo",
+  "scene_id": "sc01",
+  "shot_id": "sc01_sh01",
+  "description": "Wide shot. Golden hour on an alpine meadow. The girl walks along the ridge with her staff while her dog trots ahead, then she stops and looks around.",
+  "style_template": "spring_style",
+  "render": {"quality": "animatic", "engine": "eevee", "resolution": [1920, 1080],
+             "fps": 24, "frame_start": 1, "frame_end": 144, "samples": 32},
+  "environment": {"asset_id": "alpine_meadow", "hdri_id": "sky_golden_hour",
+                  "hdri_strength": 1.2, "fog_density": 0.02},
+  "lighting": {"preset": "golden_hour", "sun_azimuth_deg": 250},
+  "characters": [
+    {"name": "girl", "asset_id": "shepherd_girl",
+     "transform": {"location": [-4, 0, 0], "rotation_deg": [0, 0, -90]},
+     "motion_path": [
+       {"frame": 1, "location": [-4, 0, 0], "rotation_z_deg": -90},
+       {"frame": 96, "location": [1.5, 0, 0], "easing": "linear"}
+     ],
+     "actions": [
+       {"action_id": "walk_cycle", "start_frame": 1, "end_frame": 100},
+       {"action_id": "look_around", "start_frame": 94, "end_frame": 144, "blend_in": 8}
+     ]},
+    {"name": "dog", "asset_id": "sheepdog",
+     "transform": {"location": [-2.5, 0.8, 0], "rotation_deg": [0, 0, -90]},
+     "motion_path": [
+       {"frame": 1, "location": [-2.5, 0.8, 0]},
+       {"frame": 110, "location": [3.5, 0.8, 0], "easing": "linear"}
+     ],
+     "actions": [
+       {"action_id": "dog_trot", "start_frame": 1, "end_frame": 112},
+       {"action_id": "dog_idle", "start_frame": 108, "end_frame": 144, "blend_in": 6}
+     ]}
+  ],
+  "props": [
+    {"name": "staff", "asset_id": "walking_staff", "parent": "girl", "parent_bone": "DEF-hand.R"}
+  ],
+  "camera": {
+    "shot_size": "wide", "lens_mm": 40, "look_at": "girl", "look_at_height": 1.2,
+    "keys": [
+      {"frame": 1, "location": [-6, -11, 2.2]},
+      {"frame": 144, "location": [2, -10, 1.8]}
+    ],
+    "focus_target": "girl", "fstop": 4.0, "handheld_shake": 0.1
+  }
+}

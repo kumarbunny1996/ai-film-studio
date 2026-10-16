@@ -1,0 +1,48 @@
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Blender backups and autosaves
+*.blend1
+*.blend2
+*.blend@
+quit.blend
+
+# Generated project output (renders, frames, logs, shot .blend files)
+storage/projects/*
+!storage/projects/.gitkeep
+*.mp4
+*.mov
+*.mkv
+*.exr
+!assets/hdri/*.exr
+
+# Temporary output
+tmp/
+temp/
+*.tmp
+*.log
+
+# Personal Claude Code settings
+.claude/settings.local.json
+
+# OS / editor
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
