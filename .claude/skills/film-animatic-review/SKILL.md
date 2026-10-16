@@ -1,59 +1,159 @@
 ---
 name: film-animatic-review
-description: Review checklist for a rendered animatic before the human_approval stage — technical checks, framing, motion, lighting, continuity and frame aesthetics, with explicit hard gates. Use after an animatic or smoke render finishes, when asked whether a shot is ready for approval, or when a render "looks wrong". Checklist only; it cannot mark a shot visually approved until the contact-sheet worker exists and its outputs are present.
+description: Review checklist for a rendered animatic before the human_approval stage — run the contact-sheet worker, check its evidence (review/contact_sheet.png, review/frame_report.json) and the build outputs against explicit hard gates, then review framing, motion, lighting, continuity and frame aesthetics. Use after an animatic or smoke render finishes, when asked whether a shot is ready for approval, or when a render "looks wrong". Produces evidence and findings only; it never approves a shot.
 ---
 
 <!-- Adapted from RobLe3/cc-blender-skill@a2634b588e80265e796aa53f8ab178d75105c2af,
      plugin/skills/animation-quality-gate/SKILL.md.
      MIT License, Copyright (c) 2026 RobLe3 (see LICENSE in this folder).
      Modified for AI Film Studio; every change is listed in UPSTREAM.md.
-     The upstream script scripts/animation_contact_sheet.py is intentionally NOT included. -->
+     The upstream script scripts/animation_contact_sheet.py is intentionally NOT included;
+     the project worker workers/contact_sheet.py replaces it. -->
 
 # Film Animatic Review (checklist)
 
-Don't accept a shot because it rendered. Accept it only when the evidence
-passes this checklist. Even then, **only a human approves**: this checklist
-can say "ready for human approval", never "approved".
+Don't accept a shot because it rendered, or because the worker ran. Accept it
+only when the evidence passes this checklist. Even then, **only a human
+approves**: this checklist can say "ready for human approval", never
+"approved".
 
-## Status: the visual quality gate is NOT operational yet
+## Four different things, never to be confused
 
-> **The contact-sheet / frame-difference worker does not exist yet.** It is
-> planned as a fixed, tested project worker, to be designed and tested in a
-> separate stage. Until it exists and its required outputs (below) are present
-> for the exact render under review, **visual approval cannot be claimed**.
-> Report the shot as `NOT_REVIEWABLE (visual gate unavailable)`, plus any
-> technical findings.
+| Outcome | What it means | What it does **not** mean |
+|---|---|---|
+| **Worker run succeeded** (exit 0, stdout `"status": "evidence_written"`) | Inputs passed validation and both review outputs were written for the frames on disk | That the shot is good, or even reviewable (gates below still apply) |
+| **Flags and warnings** (`analysis.flags`, `warnings` in the report) | Diagnostic hints to look at in the frames | Proof of a defect, or, if absent, proof there is none |
+| **Evidence sufficient for human review** (`READY_FOR_HUMAN_APPROVAL`) | Every hard gate passes and every warning and flag has been looked at | Approval |
+| **Human approval** | A person accepted the shot | Something this skill, the worker or any render can produce |
 
-While the worker doesn't exist:
+The report always says `"verdict": "evidence_only"` and
+`"human_approval_required": true`. Visual storytelling, composition,
+animation quality and artistic intent always need human review.
 
-- Do **not** write an ad-hoc contact-sheet or image-diff script, run one-off
-  FFmpeg/Pillow/numpy commands to stand in for it, or install packages for it.
+## Rules
+
+- Make the evidence only with the fixed worker below. Do **not** write ad-hoc
+  contact-sheet or image-diff scripts, run one-off FFmpeg/Pillow/numpy
+  commands to replace or supplement it, or install packages for it.
 - Do **not** use Blender MCP or a live Blender session to inspect the shot.
 - Do **not** use AI image or video models to judge, retouch or regenerate
   frames.
-- You may look at individual PNG frames that already exist, as *preliminary
-  notes*. Label them preliminary; they don't satisfy the gate.
+- You may look at `review/contact_sheet.png` and individual frames to write
+  the review dimensions. Those notes support a human's decision; they don't
+  replace it.
+
+## Run the worker
+
+```
+uv run python -m workers.contact_sheet --shot-dir <shot-dir> [--samples N] [--cols N] [--thumb-width PX] [--force]
+```
+
+| Option | Default | Allowed | Meaning |
+|---|---|---|---|
+| `--shot-dir` | required | — | The shot directory, e.g. `storage/projects/milestone1/shots/m1_primitives` (it holds `build_report.json`, `spec.json` and `frames/`) |
+| `--samples` | 12 | 1–200 | Frames on the sheet, evenly spaced; first and last are always included (a single-frame shot gives one) |
+| `--cols` | 4 | 1–16 | Maximum grid columns |
+| `--thumb-width` | 320 | 32–1920 | Thumbnail width in pixels; height follows the frame's aspect ratio |
+| `--force` | off | — | Replace existing review output. Without it the worker refuses if either output exists |
+
+On success it prints a JSON summary to stdout and exits 0. On failure it
+prints `FAILED: <reason>` to stderr and exits 1:
+
+- **If outputs already exist and `--force` wasn't given**, it refuses and
+  leaves them untouched. Whether they belong to the current render is decided
+  by hard gate 3.
+- **Any other failure leaves neither output.** With `--force`, old outputs are
+  removed first, so a failed rerun never leaves earlier results behind. FFmpeg diagnostics for the attempt are in
+`review/contact_sheet.ffmpeg.log` and `review/frame_report.ffmpeg.log`.
+
+Re-rendering a shot does **not** remove `review/`. After any re-render, run the
+worker again with `--force` before reviewing.
 
 ## Evidence
 
-| Evidence | Exists today? | Source |
-|---|---|---|
-| Validated SceneSpec for the shot | Yes | Passed `SceneSpec` + `validate_against_manifest()` |
-| `build_report.json` (`status`, `warnings`, `frame_range`, `resolution`, `fps`, `frames_dir`) | Yes | Written by `blender/scripts/build_scene.py` |
-| Rendered PNG frames `<shot_id>_####.png` | Yes | In `frames_dir` from the build report |
-| Encoded MP4 + `.ffmpeg.log` | Yes, via `workers/run_milestone1.py` only | `workers/encode.py` (`run_shot()` in `workers/blender_job.py` alone doesn't encode) |
-| ffprobe verification (frame count, size, fps) | Yes, via `workers/run_milestone1.py` only | `workers.encode.probe()` / `verify()` |
-| **Contact sheet image** of sampled frames | **No — required** | Future contact-sheet worker |
-| **Frame-difference report** (machine-readable, per frame pair, with warnings) | **No — required** | Future contact-sheet worker |
+Paths are relative to the shot directory unless stated.
 
-The worker's exact output file names, sampling rule and thresholds will be set
-when it is designed. Don't invent them here or in a review.
+| Evidence | Produced by | Key contents |
+|---|---|---|
+| Validated SceneSpec, `spec.json` | `workers/blender_job.py` (`SceneSpec` + `validate_against_manifest()`) | The shot as planned. The worker does not re-validate it |
+| `build_report.json` | `blender/scripts/build_scene.py` | `status`, `warnings`, `frame_range`, `resolution` (actual rendered size), `fps`, `frames_dir`, `smoke` (smoke renders only) |
+| `frames/<shot_id>_####.png` | `build_scene.py` | One PNG per frame in `frame_range` |
+| MP4 + `.ffmpeg.log` + `.summary.json` in the project directory | `workers/run_milestone1.py` only (`workers/encode.py`) | Encoded shot and ffprobe verification. `run_shot()` alone doesn't encode |
+| **`review/contact_sheet.png`** | `workers/contact_sheet.py` | 8-bit RGB grid of sampled frames, in order, left to right, top to bottom. Each tile is labelled with its Blender frame number when `contact_sheet.labels` is true; unused cells are black |
+| **`review/frame_report.json`** | `workers/contact_sheet.py` | Schema `frame_report.v1`; fields below |
+
+`frame_report.json` fields to read:
+
+- `verdict` (`"evidence_only"`), `human_approval_required` (`true`).
+- `render`: `frame_range`, `frame_count`, `fps`, `resolution`,
+  `source_pix_fmt`, `smoke`, `blender_version`, all copied from or checked
+  against the build.
+- `contact_sheet`: `sampled_frames`, `columns`, `rows`, `width`, `height`,
+  `labels` (false means the label font was missing; see `warnings`).
+- `analysis.frames[]`: per frame, `frame`, `yavg`, `ydif`, `scene_score`.
+  `analysis.summary` holds `count`, `min`/`min_frame`, `max`/`max_frame` and
+  `median` for each metric.
+- `analysis.flags[]`: `frame`, `kind` (`dark_frame`, `large_difference`,
+  `scene_change`, `brightness_jump`), `metric`, `value`, `threshold`.
+- `analysis.thresholds`: the values the flags used, with
+  `"calibrated": false`.
+- `warnings[]`, `tools`, `logs`, `inputs`.
+
+### Reading the metrics
+
+All luma metrics are on an 8-bit scale (0–255), whether the PNGs are 8- or
+16-bit.
+
+- **`yavg`**: average brightness of the frame. Look at sudden changes
+  between frames (`brightness_jump`) and very dark frames (`dark_frame`).
+- **`ydif`**: mean brightness difference from the previous frame. It's high
+  for fast motion and for glitches alike.
+- **`scene_score`**: FFmpeg's scene-change score against the previous frame.
+  High values suggest a cut or pop.
+
+`ydif` and `scene_score` are `null` for the first frame (there's no previous
+frame) and are left out of the summaries. These are **diagnostic signals
+only**. The thresholds are uncalibrated, a flag is not a confirmed defect,
+and no flags doesn't mean no defects. Check every flagged frame in the
+frames themselves.
+
+### Stale-frame warnings
+
+The worker warns about PNGs in `frames_dir` outside `frame_range`, and about
+expected frames older than `spec.json`. Animatic renders don't overwrite
+existing frames, so leftovers from an earlier render are possible. These
+warnings are **hints, not proof**: a frame can be older and still correct, and
+no warning doesn't prove the frames are fresh. Resolve or record each one. If
+you can't rule out mixed renders, report `NOT_REVIEWABLE` and ask for a clean
+re-render.
 
 **What an animatic is** (`setup_render` in `build_scene.py`): with
 `render.quality: "animatic"`, the builder forces Eevee, at most 16 samples,
 50% of `render.resolution` and no motion blur. A smoke render is also 50% and
 stops after 8 frames. Judge framing, motion, timing and light direction, not
 final image quality, noise or motion blur.
+
+## NOT_REVIEWABLE
+
+Report `NOT_REVIEWABLE` with the reason when any of these apply.
+
+- **The worker failed** (exit 1, `FAILED: …`). It fails, writing no outputs,
+  when:
+  - `build_report.json` is missing or unreadable, or `status` isn't `"ok"`;
+  - `shot_id`, `frames_dir`, `frame_range`, `resolution` or `fps` is missing
+    or invalid;
+  - `frames_dir` is missing or outside the shot directory;
+  - any expected frame is missing, or the first or last frame's size differs
+    from `resolution`;
+  - a frame can't be decoded, FFmpeg/ffprobe fails, is missing or times out,
+    or the analysis covers fewer frames than expected.
+- **Required outputs are missing**: either `review/contact_sheet.png` or
+  `review/frame_report.json`.
+- **The outputs aren't for this render**:
+  - `frame_report.json` is older than `build_report.json`;
+  - `render.frame_range`, `resolution` or `fps` in the report differs from
+    `build_report.json`.
+- **Unresolved stale-frame doubt** (see above).
 
 ## Hard gates (any failure = not ready)
 
@@ -67,11 +167,12 @@ final image quality, noise or motion blur.
    `render.resolution`, which is full size. The frame range must match the
    SceneSpec unless it's a smoke render, and a smoke render is never accepted
    as final.
-3. The contact sheet **and** the frame-difference report exist for this exact
-   render (same shot_id and frame range). **Currently always fails → status
-   `NOT_REVIEWABLE`.**
-4. No unexplained high frame-to-frame jump in the difference report (once
-   thresholds exist).
+3. The worker succeeded for this exact render: both review outputs exist,
+   `frame_report.json` is newer than `build_report.json`, and its `render`
+   block matches the build report.
+4. Every entry in the report's `warnings` and `analysis.flags` has been checked
+   in the frames and either explained (e.g. intended fast motion) or written
+   down as a finding.
 5. No character T-pose, no camera below ground or inside geometry, no
    subject leaving frame unintentionally.
 
@@ -92,8 +193,10 @@ Check each one and record pass, fail or not checked.
 5. **Lighting coherence:** exposure is stable, with no flicker or sudden
    brightness change; the light direction suits the mood (see
    `film-lighting`).
-6. **Temporal artefacts:** flicker, popping or frame-to-frame visual jumps.
-   This needs the frame-difference report; don't claim it from a few frames.
+6. **Temporal artefacts:** flicker, popping or frame-to-frame jumps. Use the
+   report's per-frame metrics to find candidates, then confirm or dismiss
+   them in the frames. Don't judge this from the contact sheet alone; it
+   samples only some frames.
 7. **Continuity with neighbouring shots:** 180° rule, screen direction,
    time-of-day and lighting match.
 8. **Frame aesthetics:** sampled frames work as stills — composition, depth
@@ -105,20 +208,22 @@ Check each one and record pass, fail or not checked.
 ANIMATIC REVIEW — <shot_id>
 Status: NOT_REVIEWABLE | CHANGES_REQUESTED | READY_FOR_HUMAN_APPROVAL
 Render: <frames_dir>, frames <start>-<end>, <w>x<h> @ <fps>, smoke=<true|false>
+Evidence: review/contact_sheet.png, review/frame_report.json (sampled <frames>)
 Hard gates: 1 <pass/fail> · 2 <…> · 3 <…> · 4 <…> · 5 <…>
+Flags/warnings: <each one → explained / finding>
 Dimensions: <1–8 with pass / fail / not checked>
 Findings: <each issue → which SceneSpec field to change, or which schema gap blocks it>
-Preliminary notes (not gate evidence): <optional>
 ```
 
-`READY_FOR_HUMAN_APPROVAL` needs every hard gate to pass, so it can't be
-reached until the contact-sheet worker exists.
+`READY_FOR_HUMAN_APPROVAL` needs every hard gate to pass. It means the
+evidence is complete enough for a person to decide, not that the shot is
+approved.
 
 ## When a shot fails
 
 Fix the **spec**, not the render. Route each finding to a SceneSpec change
 (camera via `film-camera`, lighting via `film-lighting`, composition via
-`shot-composition`), re-validate, and re-run the fixed pipeline. If the fix
-needs something the schema can't express, write a schema-gap note instead of
-working around it. Stop rebuilding after repeated failures on the same
-dimension and ask a human.
+`shot-composition`), re-validate, re-run the fixed pipeline, then re-run the
+worker with `--force`. If the fix needs something the schema can't express,
+write a schema-gap note instead of working around it. Stop rebuilding after
+repeated failures on the same dimension and ask a human.

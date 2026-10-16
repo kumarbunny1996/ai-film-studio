@@ -33,23 +33,28 @@ Removed:
   Python. It has unbounded input and output paths, overwrites silently,
   doesn't create the report's parent folder, and loads all frames into
   memory at once.
-  A fixed, tested project worker will replace it in a separate stage.
+  It is replaced by the project's own worker, `workers/contact_sheet.py`
+  (project commit `5992e2c`), which is FFmpeg-only and covered by tests.
 
 Kept and adapted:
 
 - "Don't accept an animation because it rendered."
-- "No final animation without a contact sheet" (now hard gate 3).
+- "No final animation without a contact sheet" (now hard gate 3, which also
+  requires the frame report and that both match the current render).
 - Review dimensions: subject dominance, silhouette stability, motion
   coherence and frame aesthetics, re-scoped for film shots.
 
 Added (project-specific, not from upstream):
 
-- A status box saying the contact-sheet worker doesn't exist and visual
-  approval can't be claimed until its outputs exist.
+- A table separating a successful worker run, informational flags and
+  warnings, evidence sufficient for human review, and human approval.
 - A ban on ad-hoc stand-in scripts, MCP inspection and AI image/video models.
-- An evidence table listing which inputs exist today (`build_report.json`,
-  PNG frames, MP4 and ffprobe verification via `workers/run_milestone1.py`)
-  and which are required but missing.
+- How to run `workers/contact_sheet.py` (CLI options, exit behaviour,
+  `--force`), an evidence table with its outputs `review/contact_sheet.png`
+  and `review/frame_report.json` (`frame_report.v1` fields), how to read the
+  YAVG/YDIF/scene-score metrics and stale-frame warnings as hints only, and
+  the `NOT_REVIEWABLE` conditions, as read from project commit `5992e2c`.
+  (Until that commit, this section said the worker did not exist yet.)
 - A note on what animatic and smoke renders are (Eevee, 50% resolution, no
   motion blur; smoke = 8 frames), and resolution checks done against
   `build_report.json`, as read from project commit `13dd49a`.
