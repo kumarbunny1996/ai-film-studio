@@ -7,6 +7,11 @@ The LLM fills this structure (one SceneSpec per shot). It is validated twice:
 Any error messages are fed back to the LLM for a retry.
 
 Blender never sees anything that has not passed both checks.
+
+Versions:
+  1.0  asset-based shots (characters, props, environment, HDRI).
+  1.1  adds procedural `primitives` and `environment.world_color`, and allows a
+       shot without environment assets. Every valid 1.0 spec is still valid.
 """
 from __future__ import annotations
 
@@ -15,7 +20,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SPEC_VERSION = "1.0"
+SPEC_VERSION = "1.1"                           # latest; "1.0" is still accepted
 
 # ---------------------------------------------------------------------------
 # Primitives
@@ -23,6 +28,7 @@ SPEC_VERSION = "1.0"
 Vec3 = Annotated[list[float], Field(min_length=3, max_length=3)]
 Frame = Annotated[int, Field(ge=1)]
 Identifier = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{1,47}$")]
+RGB = Annotated[list[Annotated[float, Field(ge=0, le=1)]], Field(min_length=3, max_length=3)]
 
 
 class Strict(BaseModel):
@@ -90,12 +96,9 @@ class Environment(Strict):
     hdri_strength: float = Field(1.0, ge=0, le=20)
     hdri_rotation_deg: float = 0.0
     fog_density: float = Field(0.0, ge=0, le=1)  # world volume scatter
-
-    @model_validator(mode="after")
-    def _something(self) -> "Environment":
-        if not self.asset_id and not self.hdri_id:
-            raise ValueError("environment needs at least an asset_id or an hdri_id")
-        return self
+    world_color: RGB | None = None             # v1.1: plain sky colour when there is no HDRI
+    # "needs an asset_id or hdri_id" (v1.0) / "or world_color" (v1.1) is checked in
+    # SceneSpec, because the rule depends on spec_version.
 
 
 class LightingPreset(str, Enum):
@@ -159,6 +162,57 @@ class PropInstance(Strict):
 
 
 # ---------------------------------------------------------------------------
+# Procedural primitives (v1.1) — built from code, no asset files
+# ---------------------------------------------------------------------------
+class PrimitiveShape(str, Enum):
+    cube = "cube"
+    sphere = "sphere"
+    cylinder = "cylinder"
+    cone = "cone"
+    plane = "plane"
+
+
+class PrimitiveMaterial(Strict):
+    base_color: RGB = [0.8, 0.8, 0.8]          # linear RGB, 0-1
+    roughness: float = Field(0.5, ge=0, le=1)
+    metallic: float = Field(0.0, ge=0, le=1)
+
+
+class PrimitiveKey(Strict):
+    """A keyframe on a primitive. Only the channels given are keyed."""
+    frame: Frame
+    location: Vec3 | None = None
+    rotation_deg: Vec3 | None = None
+    scale: Vec3 | None = None                  # per-axis, allows squash and stretch
+    easing: Easing = Easing.ease_in_out
+
+    @model_validator(mode="after")
+    def _channels(self) -> "PrimitiveKey":
+        if self.location is None and self.rotation_deg is None and self.scale is None:
+            raise ValueError(f"primitive key at frame {self.frame} sets no channel")
+        if self.scale is not None and any(v <= 0 for v in self.scale):
+            raise ValueError(f"primitive key at frame {self.frame}: scale must be > 0")
+        return self
+
+
+class Primitive(Strict):
+    name: Identifier
+    shape: PrimitiveShape
+    size: float = Field(1.0, gt=0, le=100)     # edge length / diameter / height, metres
+    transform: Transform = Transform()
+    material: PrimitiveMaterial = PrimitiveMaterial()
+    keys: list[PrimitiveKey] = []              # empty = static
+
+    @field_validator("keys")
+    @classmethod
+    def _sorted(cls, v: list[PrimitiveKey]) -> list[PrimitiveKey]:
+        frames = [k.frame for k in v]
+        if frames != sorted(frames) or len(set(frames)) != len(frames):
+            raise ValueError("primitive keys must have unique, ascending frames")
+        return v
+
+
+# ---------------------------------------------------------------------------
 # Camera
 # ---------------------------------------------------------------------------
 class ShotSize(str, Enum):
@@ -180,7 +234,7 @@ class CameraKey(Strict):
 class Camera(Strict):
     shot_size: ShotSize = ShotSize.medium      # informational; used by planners/QA
     lens_mm: float = Field(35, ge=8, le=300)
-    look_at: Identifier | None = None          # character/prop name to track
+    look_at: Identifier | None = None          # character/prop (or v1.1 primitive) to track
     look_at_height: float = Field(1.3, ge=0, le=10)  # aim offset above target root (m)
     keys: list[CameraKey] = Field(..., min_length=1)
     dof_enabled: bool = True
@@ -206,8 +260,44 @@ class Camera(Strict):
 # ---------------------------------------------------------------------------
 # The SceneSpec
 # ---------------------------------------------------------------------------
+# JSON Schema form of the version-dependent rules enforced in SceneSpec._versions,
+# so the exported schema describes both 1.0 and 1.1 accurately.
+_VERSION_RULES = {
+    "allOf": [
+        {
+            "if": {"properties": {"spec_version": {"const": "1.0"}}},
+            "then": {
+                "properties": {
+                    "primitives": {"maxItems": 0},
+                    "environment": {
+                        "properties": {"world_color": {"type": "null"}},
+                        "anyOf": [
+                            {"required": ["asset_id"], "properties": {"asset_id": {"type": "string"}}},
+                            {"required": ["hdri_id"], "properties": {"hdri_id": {"type": "string"}}},
+                        ],
+                    },
+                },
+            },
+            "else": {
+                "properties": {
+                    "environment": {
+                        "anyOf": [
+                            {"required": ["asset_id"], "properties": {"asset_id": {"type": "string"}}},
+                            {"required": ["hdri_id"], "properties": {"hdri_id": {"type": "string"}}},
+                            {"required": ["world_color"], "properties": {"world_color": {"type": "array"}}},
+                        ],
+                    },
+                },
+            },
+        }
+    ]
+}
+
+
 class SceneSpec(Strict):
-    spec_version: Literal["1.0"] = SPEC_VERSION
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_VERSION_RULES)
+
+    spec_version: Literal["1.0", "1.1"] = "1.0"   # omitted = 1.0, as before 1.1 existed
     project_id: str
     scene_id: Identifier                       # e.g. "sc03"
     shot_id: Identifier                        # e.g. "sc03_sh02"
@@ -218,12 +308,28 @@ class SceneSpec(Strict):
     lighting: Lighting = Lighting()
     characters: list[CharacterInstance] = []
     props: list[PropInstance] = []
+    primitives: list[Primitive] = []                # v1.1+
     camera: Camera
+
+    @model_validator(mode="after")
+    def _versions(self) -> "SceneSpec":
+        env = self.environment
+        if self.spec_version == "1.0":
+            if self.primitives:
+                raise ValueError("primitives require spec_version 1.1")
+            if env.world_color is not None:
+                raise ValueError("environment.world_color requires spec_version 1.1")
+            if not env.asset_id and not env.hdri_id:
+                raise ValueError("environment needs at least an asset_id or an hdri_id")
+        elif not env.asset_id and not env.hdri_id and env.world_color is None:
+            raise ValueError("environment needs an asset_id, an hdri_id or a world_color")
+        return self
 
     @model_validator(mode="after")
     def _cross_checks(self) -> "SceneSpec":
         fs, fe = self.render.frame_start, self.render.frame_end
-        names = [c.name for c in self.characters] + [p.name for p in self.props]
+        names = ([c.name for c in self.characters] + [p.name for p in self.props]
+                 + [p.name for p in self.primitives])
         dupes = {n for n in names if names.count(n) > 1}
         if dupes:
             raise ValueError(f"instance names must be unique; duplicated: {sorted(dupes)}")
@@ -252,12 +358,17 @@ class SceneSpec(Strict):
             if p.parent_bone and not p.parent:
                 raise ValueError(f"prop '{p.name}' has parent_bone but no parent")
 
+        for prim in self.primitives:
+            for k in prim.keys:
+                in_range(k.frame, f"primitives[{prim.name}].keys")
+
         for k in self.camera.keys:
             in_range(k.frame, "camera.keys")
         for ref, label in ((self.camera.look_at, "look_at"),
                            (self.camera.focus_target, "focus_target")):
             if ref and ref not in known:
-                raise ValueError(f"camera.{label} '{ref}' is not a character or prop in this shot")
+                raise ValueError(f"camera.{label} '{ref}' is not a character, prop "
+                                 "or primitive in this shot")
         return self
 
 

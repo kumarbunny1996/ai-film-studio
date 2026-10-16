@@ -14,6 +14,7 @@ package = false            # an application, not an installable library
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]         # lets tests import apps.* and workers.*
+addopts = "-m 'not blender and not render'"   # slow tests: pytest -m blender / -m render
 markers = [
   "blender: runs headless Blender (slow)",
   "render: full 96-frame render + MP4 encode (very slow)",

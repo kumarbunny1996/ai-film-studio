@@ -12,10 +12,15 @@ Run headless, always starting from the style template (never edit the template i
 Outputs in --out:
     <shot_id>.blend         the assembled shot (open it to debug)
     frames/<shot_id>_####.png
-    build_report.json       status, warnings, timings — read by the worker
+    build_report.json       status, warnings, timings, peak memory — read by the worker
+
+Pass --smoke to render only the first 8 frames at 50% resolution (a quick, low-memory
+check of the real shot before a full render).
 
 The spec MUST already be validated by apps/api/schemas/scene_spec.py
 (Blender's bundled Python has no pydantic). This script only does light sanity checks.
+Spec 1.0 shots are built from library assets; 1.1 adds procedural primitives
+(bmesh geometry + Principled BSDF materials) that need no asset files.
 Tested against the Blender 4.2+ API; version differences (Eevee Next, layered actions,
 video media types) are handled by the small compatibility helpers below.
 """
@@ -30,11 +35,13 @@ import time
 import traceback
 from pathlib import Path
 
+import bmesh
 import bpy
 from mathutils import Euler
 
-SUPPORTED_SPEC = "1.0"
+SUPPORTED_SPECS = ("1.0", "1.1")
 SHOT_COLLECTION = "SHOT"
+SMOKE_FRAMES = 8
 
 EASING = {"linear": "LINEAR", "ease_in_out": "BEZIER", "constant": "CONSTANT"}
 
@@ -68,8 +75,41 @@ class Report:
         self._t = now
 
     def write(self, out: Path) -> None:
+        self.data["memory_mb"] = peak_memory_mb()
         out.mkdir(parents=True, exist_ok=True)
         (out / "build_report.json").write_text(json.dumps(self.data, indent=2))
+
+
+def peak_memory_mb() -> dict | None:
+    """Peak RAM of this Blender process so far, for watching low-memory machines."""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            from ctypes import wintypes
+
+            class Counters(ctypes.Structure):
+                _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD)] + [
+                    (n, ctypes.c_size_t) for n in (
+                        "PeakWorkingSetSize", "WorkingSetSize", "QuotaPeakPagedPoolUsage",
+                        "QuotaPagedPoolUsage", "QuotaPeakNonPagedPoolUsage",
+                        "QuotaNonPagedPoolUsage", "PagefileUsage", "PeakPagefileUsage")]
+
+            c = Counters()
+            c.cb = ctypes.sizeof(Counters)
+            kernel32 = ctypes.windll.kernel32
+            kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+            get_info = ctypes.windll.psapi.GetProcessMemoryInfo
+            get_info.argtypes = [wintypes.HANDLE, ctypes.POINTER(Counters), wintypes.DWORD]
+            get_info.restype = wintypes.BOOL
+            if not get_info(kernel32.GetCurrentProcess(), ctypes.byref(c), c.cb):
+                return None
+            return {"peak_working_set": round(c.PeakWorkingSetSize / 2**20, 1),
+                    "peak_committed": round(c.PeakPagefileUsage / 2**20, 1)}
+        import resource
+        peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        return {"peak_working_set": round(peak / (2**20 if sys.platform == "darwin" else 2**10), 1)}
+    except Exception:  # noqa: BLE001 — memory stats are diagnostic only
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -293,6 +333,12 @@ def setup_world(scene, lib: Library, env: dict) -> None:
         nt.links.new(mapping.outputs["Vector"], tex.inputs["Vector"])
         nt.links.new(tex.outputs["Color"], bg.inputs["Color"])
         nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
+    elif env.get("world_color"):
+        nt.nodes.clear()
+        out = nt.nodes.new("ShaderNodeOutputWorld")
+        bg = nt.nodes.new("ShaderNodeBackground")
+        bg.inputs["Color"].default_value = (*env["world_color"], 1.0)
+        nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
 
     if fog > 0:
         out = next((n for n in nt.nodes if n.bl_idname == "ShaderNodeOutputWorld"), None)
@@ -335,13 +381,92 @@ def setup_lighting(scene, shot_coll, lighting: dict, report: Report) -> None:
     sun.rotation_euler = Euler((math.radians(90 - elev), 0, math.radians(az)))
 
 
+def primitive_mesh(name: str, shape: str, size: float) -> bpy.types.Mesh:
+    """Geometry is centred on the object origin; size = edge / diameter / height."""
+    bm = bmesh.new()
+    r = size / 2
+    if shape == "cube":
+        bmesh.ops.create_cube(bm, size=size)
+    elif shape == "sphere":
+        bmesh.ops.create_uvsphere(bm, u_segments=32, v_segments=16, radius=r)
+    elif shape in ("cylinder", "cone"):
+        bmesh.ops.create_cone(bm, cap_ends=True, cap_tris=False, segments=32, radius1=r,
+                              radius2=r if shape == "cylinder" else 0.0, depth=size)
+    elif shape == "plane":
+        bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=r)
+    else:
+        bm.free()
+        raise BuildError(f"unknown primitive shape '{shape}'")
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    if shape == "sphere":
+        for poly in mesh.polygons:
+            poly.use_smooth = True
+    return mesh
+
+
+def primitive_material(name: str, m: dict, report: Report) -> bpy.types.Material:
+    color = (*m.get("base_color", [0.8, 0.8, 0.8]), 1.0)
+    mat = bpy.data.materials.new(name)
+    mat.diffuse_color = color                  # viewport / Workbench colour
+    if mat.node_tree is None:
+        mat.use_nodes = True
+    bsdf = next((n for n in mat.node_tree.nodes if n.bl_idname == "ShaderNodeBsdfPrincipled"), None)
+    if bsdf is None:
+        report.warn(f"{name}: no Principled BSDF node; using viewport colour only")
+        return mat
+    bsdf.inputs["Base Color"].default_value = color
+    bsdf.inputs["Roughness"].default_value = m.get("roughness", 0.5)
+    bsdf.inputs["Metallic"].default_value = m.get("metallic", 0.0)
+    return mat
+
+
+def key_primitive(obj, keys: list[dict]) -> None:
+    for k in keys:
+        f = k["frame"]
+        if k.get("location") is not None:
+            obj.location = k["location"]
+            obj.keyframe_insert("location", frame=f)
+        if k.get("rotation_deg") is not None:
+            obj.rotation_euler = Euler([math.radians(d) for d in k["rotation_deg"]])
+            obj.keyframe_insert("rotation_euler", frame=f)
+        if k.get("scale") is not None:
+            obj.scale = k["scale"]
+            obj.keyframe_insert("scale", frame=f)
+    for k in keys:
+        set_key_interpolation(obj, k["frame"], k.get("easing", "ease_in_out"))
+
+
+def build_primitives(prims: list[dict], shot_coll, report: Report) -> dict[str, bpy.types.Object]:
+    objs = {}
+    for p in prims:
+        name = p["name"]
+        mesh = primitive_mesh(f"PRIM-{name}", p["shape"], p.get("size", 1.0))
+        mesh.materials.append(primitive_material(f"MAT-{name}", p.get("material", {}), report))
+        obj = bpy.data.objects.new(f"PRIM-{name}", mesh)
+        obj["afs_primitive"] = p["shape"]
+        shot_coll.objects.link(obj)
+        apply_transform(obj, p.get("transform", {}))
+        key_primitive(obj, p.get("keys", []))
+        objs[name] = obj
+    return objs
+
+
 def aim_target(name: str, roots: dict, height: float, shot_coll) -> bpy.types.Object:
     if name not in roots:
         raise BuildError(f"camera target '{name}' does not exist in this shot")
     aim = bpy.data.objects.get(f"AIM-{name}")
     if aim is None:
         aim = make_empty(f"AIM-{name}", shot_coll, 0.2)
-        aim.parent = roots[name]
+        target = roots[name]
+        if target.get("afs_primitive"):
+            # follow position only, so a spinning or squashing primitive doesn't swing the aim
+            con = aim.constraints.new("COPY_LOCATION")
+            con.target = target
+            con.use_offset = True
+        else:
+            aim.parent = target
         aim.location = (0, 0, height)
     return aim
 
@@ -444,12 +569,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--manifest", type=Path, help="defaults to <assets-root>/manifest.json")
     p.add_argument("--out", required=True, type=Path)
     p.add_argument("--no-render", action="store_true", help="build and save .blend only")
+    p.add_argument("--smoke", action="store_true",
+                   help=f"render only the first {SMOKE_FRAMES} frames at 50%% resolution")
     return p.parse_args(argv)
 
 
 def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
-    if spec.get("spec_version") != SUPPORTED_SPEC:
-        raise BuildError(f"spec_version {spec.get('spec_version')} != {SUPPORTED_SPEC}")
+    if spec.get("spec_version", "1.0") not in SUPPORTED_SPECS:
+        raise BuildError(f"spec_version {spec.get('spec_version')} not in {SUPPORTED_SPECS}")
     if not bpy.data.filepath:
         report.warn("no style template loaded; starting from an empty scene")
         bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -463,6 +590,10 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
     out = args.out.resolve()
 
     setup_render(scene, spec["render"], spec["shot_id"], out)
+    if args.smoke:
+        scene.frame_end = min(scene.frame_end, scene.frame_start + SMOKE_FRAMES - 1)
+        scene.render.resolution_percentage = 50
+        report.data["smoke"] = True
     report.lap("render_setup")
 
     env = spec["environment"]
@@ -504,6 +635,9 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
         roots[prop["name"]] = root_obj
     report.lap("props")
 
+    roots.update(build_primitives(spec.get("primitives", []), shot_coll, report))
+    report.lap("primitives")
+
     setup_camera(scene, shot_coll, spec["camera"], roots, seed)
     report.lap("camera")
 
@@ -517,6 +651,10 @@ def build(args: argparse.Namespace, report: Report, spec: dict) -> None:
         bpy.ops.render.render(animation=True)
         report.data["frames_dir"] = str(out / "frames")
         report.data["frame_range"] = [scene.frame_start, scene.frame_end]
+        pct = scene.render.resolution_percentage / 100
+        report.data["resolution"] = [round(scene.render.resolution_x * pct),
+                                     round(scene.render.resolution_y * pct)]
+        report.data["fps"] = scene.render.fps
         report.lap("render")
 
 

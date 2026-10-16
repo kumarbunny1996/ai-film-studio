@@ -293,6 +293,25 @@
           "minimum": 0,
           "title": "Fog Density",
           "type": "number"
+        },
+        "world_color": {
+          "anyOf": [
+            {
+              "items": {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "World Color"
         }
       },
       "title": "Environment",
@@ -367,6 +386,187 @@
         "night"
       ],
       "title": "LightingPreset",
+      "type": "string"
+    },
+    "Primitive": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "shape": {
+          "$ref": "#/$defs/PrimitiveShape"
+        },
+        "size": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "maximum": 100,
+          "title": "Size",
+          "type": "number"
+        },
+        "transform": {
+          "$ref": "#/$defs/Transform",
+          "default": {
+            "location": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "rotation_deg": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "scale": 1.0
+          }
+        },
+        "material": {
+          "$ref": "#/$defs/PrimitiveMaterial",
+          "default": {
+            "base_color": [
+              0.8,
+              0.8,
+              0.8
+            ],
+            "roughness": 0.5,
+            "metallic": 0.0
+          }
+        },
+        "keys": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/PrimitiveKey"
+          },
+          "title": "Keys",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "shape"
+      ],
+      "title": "Primitive",
+      "type": "object"
+    },
+    "PrimitiveKey": {
+      "additionalProperties": false,
+      "description": "A keyframe on a primitive. Only the channels given are keyed.",
+      "properties": {
+        "frame": {
+          "minimum": 1,
+          "title": "Frame",
+          "type": "integer"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "rotation_deg": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rotation Deg"
+        },
+        "scale": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scale"
+        },
+        "easing": {
+          "$ref": "#/$defs/Easing",
+          "default": "ease_in_out"
+        }
+      },
+      "required": [
+        "frame"
+      ],
+      "title": "PrimitiveKey",
+      "type": "object"
+    },
+    "PrimitiveMaterial": {
+      "additionalProperties": false,
+      "properties": {
+        "base_color": {
+          "default": [
+            0.8,
+            0.8,
+            0.8
+          ],
+          "items": {
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "title": "Base Color",
+          "type": "array"
+        },
+        "roughness": {
+          "default": 0.5,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Roughness",
+          "type": "number"
+        },
+        "metallic": {
+          "default": 0.0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Metallic",
+          "type": "number"
+        }
+      },
+      "title": "PrimitiveMaterial",
+      "type": "object"
+    },
+    "PrimitiveShape": {
+      "enum": [
+        "cube",
+        "sphere",
+        "cylinder",
+        "cone",
+        "plane"
+      ],
+      "title": "PrimitiveShape",
       "type": "string"
     },
     "PropInstance": {
@@ -613,10 +813,98 @@
     }
   },
   "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "environment": {
+            "anyOf": [
+              {
+                "properties": {
+                  "asset_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "asset_id"
+                ]
+              },
+              {
+                "properties": {
+                  "hdri_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hdri_id"
+                ]
+              },
+              {
+                "properties": {
+                  "world_color": {
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "world_color"
+                ]
+              }
+            ]
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "spec_version": {
+            "const": "1.0"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "primitives": {
+            "maxItems": 0
+          },
+          "environment": {
+            "anyOf": [
+              {
+                "properties": {
+                  "asset_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "asset_id"
+                ]
+              },
+              {
+                "properties": {
+                  "hdri_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hdri_id"
+                ]
+              }
+            ],
+            "properties": {
+              "world_color": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "properties": {
     "spec_version": {
-      "const": "1.0",
       "default": "1.0",
+      "enum": [
+        "1.0",
+        "1.1"
+      ],
       "title": "Spec Version",
       "type": "string"
     },
@@ -689,6 +977,14 @@
         "$ref": "#/$defs/PropInstance"
       },
       "title": "Props",
+      "type": "array"
+    },
+    "primitives": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Primitive"
+      },
+      "title": "Primitives",
       "type": "array"
     },
     "camera": {

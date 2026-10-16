@@ -1,0 +1,54 @@
+{
+  "spec_version": "1.1",
+  "project_id": "milestone1",
+  "scene_id": "sc01",
+  "shot_id": "m1_primitives",
+  "description": "Milestone 1. Procedural shapes on a ground plane: a red cube slides and spins past a stone pedestal, a blue ball bounces, a yellow cone turns. The camera arcs around the pedestal.",
+  "render": {"quality": "final", "engine": "eevee", "resolution": [640, 360],
+             "fps": 24, "frame_start": 1, "frame_end": 96, "samples": 16,
+             "motion_blur": false, "seed": 0},
+  "environment": {"world_color": [0.45, 0.55, 0.70]},
+  "lighting": {"preset": "midday", "sun_azimuth_deg": 140},
+  "primitives": [
+    {"name": "ground", "shape": "plane", "size": 20,
+     "material": {"base_color": [0.30, 0.34, 0.28], "roughness": 0.9}},
+    {"name": "pedestal", "shape": "cylinder", "size": 1.0,
+     "transform": {"location": [0, 0, 0.5]},
+     "material": {"base_color": [0.55, 0.55, 0.58], "roughness": 0.7}},
+    {"name": "cube", "shape": "cube", "size": 0.8,
+     "material": {"base_color": [0.80, 0.12, 0.08], "roughness": 0.4},
+     "keys": [
+       {"frame": 1, "location": [-3, 1.5, 0.4], "rotation_deg": [0, 0, 0], "easing": "linear"},
+       {"frame": 96, "location": [3, 1.5, 0.4], "rotation_deg": [0, 0, 360]}
+     ]},
+    {"name": "ball", "shape": "sphere", "size": 0.7,
+     "material": {"base_color": [0.10, 0.30, 0.85], "roughness": 0.3},
+     "keys": [
+       {"frame": 1, "location": [2, -1.5, 0.35]},
+       {"frame": 13, "location": [2, -1.5, 1.8]},
+       {"frame": 25, "location": [2, -1.5, 0.35]},
+       {"frame": 37, "location": [2, -1.5, 1.5]},
+       {"frame": 49, "location": [2, -1.5, 0.35]},
+       {"frame": 61, "location": [2, -1.5, 1.2]},
+       {"frame": 73, "location": [2, -1.5, 0.35]},
+       {"frame": 85, "location": [2, -1.5, 0.9]},
+       {"frame": 96, "location": [2, -1.5, 0.35]}
+     ]},
+    {"name": "cone", "shape": "cone", "size": 0.9,
+     "transform": {"location": [-2, -1.5, 0.45]},
+     "material": {"base_color": [0.90, 0.70, 0.10], "roughness": 0.5},
+     "keys": [
+       {"frame": 1, "rotation_deg": [0, 0, 0], "easing": "linear"},
+       {"frame": 96, "rotation_deg": [0, 0, -180]}
+     ]}
+  ],
+  "camera": {
+    "shot_size": "wide", "lens_mm": 35, "look_at": "pedestal", "look_at_height": 0.3,
+    "keys": [
+      {"frame": 1, "location": [-7, -7, 3.2]},
+      {"frame": 48, "location": [0, -9.5, 3.6]},
+      {"frame": 96, "location": [7, -7, 3.2]}
+    ],
+    "dof_enabled": false
+  }
+}
