@@ -305,7 +305,10 @@ def place_actions(lib: Library, arm, char: dict, report: Report) -> None:
         strip.repeat = max(0.1, repeat)
 
         strip.use_auto_blend = False
-        strip.blend_in = min(clip.get("blend_in", 6), (strip.frame_end - strip.frame_start) / 2)
+        # blend_in crossfades FROM the previous clip; the first clip has none, and a blend-in
+        # on the lowest strip would fade in from the rest pose (Milestone 6, reproduced)
+        strip.blend_in = 0.0 if i == 0 else min(clip.get("blend_in", 6),
+                                                (strip.frame_end - strip.frame_start) / 2)
         strip.extrapolation = "HOLD" if i == 0 else "HOLD_FORWARD"
         strip.blend_type = "REPLACE"
 

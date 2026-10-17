@@ -1,0 +1,58 @@
+{
+  "spec_version": "1.3",
+  "project_id": "milestone6_character",
+  "scene_id": "sc01",
+  "shot_id": "m6_character",
+  "description": "Milestone 6 character demo: the homemade mannequin walks left to right between two stone pillars carrying a baton in its right hand, stops and breathes. Root travel matches the authored walk cycle (0.03361 m/frame) so the planted foot holds still; the walk ends at mid-stance on frame 81, where the root stops, and crossfades into idle over frames 81-89. Three shots on one timeline: a 28 mm wide, a 50 mm tracking medium whose dolly holds when the character stops, and an 85 mm close-up on the idle.",
+  "render": {"quality": "final", "engine": "eevee", "resolution": [640, 360],
+             "fps": 24, "frame_start": 1, "frame_end": 120, "samples": 16,
+             "motion_blur": false, "seed": 0},
+  "environment": {"world_color": [0.45, 0.55, 0.70]},
+  "lighting": {"preset": "midday", "sun_azimuth_deg": 100},
+  "primitives": [
+    {"name": "ground", "shape": "plane", "size": 100,
+     "material": {"base_color": [0.30, 0.34, 0.28], "roughness": 0.9}},
+    {"name": "pillar_left", "shape": "cylinder", "size": 2.0,
+     "transform": {"location": [-3.5, 2.5, 1.0]},
+     "material": {"base_color": [0.55, 0.55, 0.58], "roughness": 0.7}},
+    {"name": "pillar_right", "shape": "cylinder", "size": 2.0,
+     "transform": {"location": [3.5, 3.0, 1.0]},
+     "material": {"base_color": [0.55, 0.55, 0.58], "roughness": 0.7}}
+  ],
+  "characters": [
+    {"name": "hero", "asset_id": "mannequin",
+     "transform": {"location": [-0.761669, 0.0, 0.0], "rotation_deg": [0.0, 0.0, 90.0]},
+     "motion_path": [
+       {"frame": 1, "location": [-0.761669, 0.0, 0.0], "rotation_z_deg": 90.0, "easing": "linear"},
+       {"frame": 81, "location": [1.926779, 0.0, 0.0], "rotation_z_deg": 90.0}
+     ],
+     "actions": [
+       {"action_id": "mannequin_walk", "start_frame": 1, "end_frame": 81, "blend_in": 0},
+       {"action_id": "mannequin_idle", "start_frame": 81, "end_frame": 120, "blend_in": 8}
+     ]}
+  ],
+  "props": [
+    {"name": "baton", "asset_id": "mannequin_baton", "parent": "hero", "parent_bone": "hand.R",
+     "transform": {"rotation_deg": [180.0, 0.0, 0.0]}}
+  ],
+  "shots": [
+    {"shot_id": "sh01_wide", "frame_start": 1, "frame_end": 48,
+     "camera": {"shot_size": "wide", "lens_mm": 28, "look_at": "hero", "look_at_height": 1.1,
+                "dof_enabled": false,
+                "keys": [{"frame": 1, "location": [0.0, -10.0, 2.4]},
+                         {"frame": 48, "location": [0.4, -9.6, 2.3]}]}},
+    {"shot_id": "sh02_track", "frame_start": 49, "frame_end": 88,
+     "camera": {"shot_size": "medium", "lens_mm": 50, "look_at": "hero", "look_at_height": 0.9,
+                "dof_enabled": true, "fstop": 4.0,
+                "keys": [{"frame": 49, "location": [-0.6, -5.5, 1.4], "easing": "linear"},
+                         {"frame": 81, "location": [1.041026, -5.5, 1.4], "easing": "constant"},
+                         {"frame": 88, "location": [1.041026, -5.5, 1.4]}]}},
+    {"shot_id": "sh03_close", "frame_start": 89, "frame_end": 120,
+     "camera": {"shot_size": "close_up", "lens_mm": 85, "look_at": "hero", "look_at_height": 1.45,
+                "framing": {"subject_offset": [-0.1667, 0.0]},
+                "clip_start_m": 0.05, "clip_end_m": 100,
+                "dof_enabled": true, "focus_target": "hero", "fstop": 2.8,
+                "keys": [{"frame": 89, "location": [3.4, -3.6, 1.5]},
+                         {"frame": 120, "location": [3.0, -3.8, 1.5]}]}}
+  ]
+}
