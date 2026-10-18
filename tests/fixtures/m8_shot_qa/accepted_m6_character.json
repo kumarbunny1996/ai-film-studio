@@ -1,0 +1,42 @@
+[
+ {
+  "frames": [
+   89,
+   104
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "pillar_right",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "The right pillar's edge shows at the right edge of the close-up (4% of it). Real but minor; part of the approved M6 example.",
+  "rule": "edge_sliver",
+  "shot_id": "sh03_close"
+ },
+ {
+  "frames": [
+   80,
+   88
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "hero",
+    "kind": "character"
+   },
+   {
+    "id": "neck",
+    "kind": "part"
+   },
+   {
+    "id": "pillar_right",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "Genuine static tangent found in Gate 2: the hero's head and neck sit against the right pillar's edge during the dolly hold (gap 0.0008, relative speed 0.0007). Accepted as a known issue for Milestone 8 (Gate 2 decision); severity and evidence kept.",
+  "rule": "tangent",
+  "shot_id": "sh02_track"
+ }
+]

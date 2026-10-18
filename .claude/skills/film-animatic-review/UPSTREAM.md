@@ -75,3 +75,10 @@ Updated for SceneSpec v1.3 (Milestone 4, project branch `milestone4/multishot-sc
   not automated.
 - The partial-render refusal added to NOT_REVIEWABLE and the hard gates, and a
   Cuts line in the report format.
+
+Updated for Milestone 8 (Shot QA, project branch `milestone-8-shot-qa`):
+
+- A Composition QA section: the fixed workers `inspect_shot_geometry.py`,
+  `workers.shot_qa` and `workers.composition_sheet`, their `review/` outputs,
+  evidence-only semantics, and what `info`, `accepted_issue` and
+  `false_positive` mean.

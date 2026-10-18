@@ -1,0 +1,86 @@
+[
+ {
+  "frames": [
+   361,
+   432
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "host",
+    "kind": "character"
+   },
+   {
+    "id": "lamp_post",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "The lamp post (moved to (3.6, 0.4) in the final fix) runs just beside B's torso behind the lowered left arm. Real but minor; part of the composition approved with final_rev2.",
+  "rule": "tangent",
+  "shot_id": "sh05_host_wave"
+ },
+ {
+  "frames": [
+   433,
+   504
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "tree1_crown",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "A corner of tree1's crown shows at the right edge late in sh06 (about 20% of the crown, 11% of the frame width). Real but minor; visible in the approved final_rev2.",
+  "rule": "edge_sliver",
+  "shot_id": "sh06_traveller_wave"
+ },
+ {
+  "frames": [
+   265,
+   360
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "host",
+    "kind": "character"
+   },
+   {
+    "id": "neck",
+    "kind": "part"
+   },
+   {
+    "id": "tree2_crown",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "Genuine static tangent found in Gate 2: the left edge of tree2's crown runs along B's neck and shoulder for the whole two-shot (gap 0.0059, relative speed 0.0002). Accepted as a known issue for Milestone 8 (Gate 2 decision); severity and evidence kept.",
+  "rule": "tangent",
+  "shot_id": "sh04_two_shot"
+ },
+ {
+  "frames": [
+   505,
+   530
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "traveller",
+    "kind": "character"
+   },
+   {
+    "id": "neck",
+    "kind": "part"
+   },
+   {
+    "id": "tree3_crown",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "Genuine static tangent found in Gate 2: the base of tree3's crown runs across A's neck at the start of the closing wide (gap 0.0045, relative speed 0.0002). Accepted as a known issue for Milestone 8 (Gate 2 decision); severity and evidence kept.",
+  "rule": "tangent",
+  "shot_id": "sh07_end_wide"
+ }
+]

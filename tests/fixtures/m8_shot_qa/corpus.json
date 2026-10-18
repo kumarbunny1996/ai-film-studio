@@ -1,0 +1,256 @@
+{
+ "cases": [
+  {
+   "base": "m7_gate1_first",
+   "case": 1,
+   "expected": {
+    "absent_rule": "wide_body_cropped",
+    "character": "traveller",
+    "min_left_margin": 0.03
+   },
+   "frames": [
+    265,
+    300
+   ],
+   "name": "m7_sh04_gate1_camera_crop",
+   "note": "The Gate 1 claim that A was half out of frame came from the planning-time box model (+-0.3 m around the root). On the real silhouette A is fully in frame at the cut, 0.040 frame heights from the left edge, so the crop rule correctly does not fire.",
+   "patch": {
+    "sh04_two_shot": {
+     "framing": {
+      "subject_offset": [
+       0.2,
+       0.0
+      ]
+     },
+     "lens_mm": 35.0
+    }
+   },
+   "provenance": "sh04 lens 35 mm / subject_offset [0.2, 0.0] were the Gate 1 planning values before the pre-render fix to 30 mm / 0.22; documented in the Gate 1 report, never built or preserved as a file. Base = the earliest preserved spec (Gate 1 first pass), which differs from the pre-fix spec only in these two values.",
+   "status": "not_reproduced"
+  },
+  {
+   "base": "m7_gate1_rev1",
+   "case": 2,
+   "expected": {
+    "objects": [
+     {
+      "id": "tree1_trunk",
+      "kind": "primitive"
+     },
+     {
+      "id": "top",
+      "kind": "edge"
+     }
+    ],
+    "rule": "edge_sliver",
+    "severity": "warning",
+    "shot_id": "sh02_host_look",
+    "window": [
+     85,
+     144
+    ]
+   },
+   "frames": [
+    85,
+    144
+   ],
+   "name": "m7_sh02_trunk_stub",
+   "patch": {},
+   "provenance": "preserved Gate 1 revision 1 spec (sh02 55 mm, camera height 2.6 / 2.5 m)"
+  },
+  {
+   "base": "m7_gate3_rev1",
+   "case": 3,
+   "expected": {
+    "objects": [
+     {
+      "id": "host",
+      "kind": "character"
+     },
+     {
+      "id": "lamp_post",
+      "kind": "primitive"
+     }
+    ],
+    "rule": "raised_hand_contact",
+    "severity": "warning",
+    "shot_id": "sh05_host_wave",
+    "window": [
+     378,
+     414
+    ]
+   },
+   "frames": [
+    361,
+    432
+   ],
+   "name": "m7_sh05_rev1_forearm_post",
+   "patch": {},
+   "provenance": "preserved Gate 3 revision 1 spec (original sh05 camera, lamp post at (2.9, 0.7))"
+  },
+  {
+   "base": "m7_gate3_rev2",
+   "case": 4,
+   "expected": {
+    "objects": [
+     {
+      "id": "tree2_crown",
+      "kind": "primitive"
+     },
+     {
+      "id": "left",
+      "kind": "edge"
+     }
+    ],
+    "rule": "edge_sliver",
+    "severity": "warning",
+    "shot_id": "sh05_host_wave",
+    "window": [
+     361,
+     432
+    ]
+   },
+   "frames": [
+    361,
+    432
+   ],
+   "name": "m7_sh05_tree2_sliver",
+   "patch": {},
+   "provenance": "preserved Gate 3 revision 2 spec (sh05 camera moved 0.5 m toward -Y, tree2 at (5.5, 11))"
+  },
+  {
+   "base": "m7_final_rev1",
+   "case": 5,
+   "expected": {
+    "objects": [
+     {
+      "id": "host",
+      "kind": "character"
+     },
+     {
+      "id": "head",
+      "kind": "part"
+     },
+     {
+      "id": "lamp_post",
+      "kind": "primitive"
+     }
+    ],
+    "rule": "tangent",
+    "severity": "error",
+    "shot_id": "sh05_host_wave",
+    "window": [
+     361,
+     432
+    ]
+   },
+   "frames": [
+    361,
+    432
+   ],
+   "name": "m7_sh05_post_head_tangent",
+   "patch": {},
+   "provenance": "preserved final revision 1 spec (lamp post at (2.9, 0.7) with the revised sh05 camera)"
+  },
+  {
+   "base": "m7_gate1_first",
+   "case": 6,
+   "expected": {
+    "objects": [
+     {
+      "id": "traveller",
+      "kind": "character"
+     }
+    ],
+    "rule": "backlight",
+    "severity": "warning",
+    "shot_id": "sh06_traveller_wave",
+    "window": [
+     433,
+     504
+    ]
+   },
+   "frames": [
+    433,
+    504
+   ],
+   "name": "m7_sh06_backlit_az300",
+   "patch": {},
+   "provenance": "preserved Gate 1 first-pass spec (sun azimuth 300 deg)"
+  },
+  {
+   "base": "approved",
+   "case": 7,
+   "expected": {
+    "objects": [
+     {
+      "id": "host",
+      "kind": "character"
+     },
+     {
+      "id": "traveller",
+      "kind": "character"
+     }
+    ],
+    "rule": "camera_side",
+    "severity": "error",
+    "shot_id": "sh06_traveller_wave",
+    "window": [
+     433,
+     433
+    ]
+   },
+   "frames": [
+    425,
+    512
+   ],
+   "name": "constructed_camera_side_violation",
+   "patch": {
+    "sh06_traveller_wave": {
+     "keys": [
+      {
+       "frame": 433,
+       "location": [
+        3.6,
+        1.6,
+        1.6
+       ]
+      },
+      {
+       "frame": 504,
+       "location": [
+        3.5,
+        1.5,
+        1.6
+       ]
+      }
+     ]
+    }
+   },
+   "provenance": "constructed: the approved spec (schemas/examples/m7_greeting.json) with the sh06 camera mirrored across the A-B axis (y -1.6 -> +1.6)"
+  }
+ ],
+ "description": "Milestone 8 Shot QA regression corpus: the seven historical M7 composition defect cases.",
+ "specs": {
+  "m7_final_rev1": {
+   "source": "storage/projects/m7_greeting/final_rev1/shots/m7_greeting/spec.json",
+   "source_sha256": "92f39d61b2ee91bf0452a51f54362e068cb419eabb28442360e86065ee0860c0"
+  },
+  "m7_gate1_first": {
+   "source": "storage/projects/m7_greeting/shots/m7_greeting/spec.json",
+   "source_sha256": "ef8585677c048a2423651873abdbf1fbd031d3d5f9fcb38238f71f398d6fa2c5"
+  },
+  "m7_gate1_rev1": {
+   "source": "storage/projects/m7_greeting/gate1_rev1/shots/m7_greeting/spec.json",
+   "source_sha256": "fff97d2d81e758e63fdca27b45913a73521f8ddab9eef735292e50c09010c74c"
+  },
+  "m7_gate3_rev1": {
+   "source": "storage/projects/m7_greeting/gate3_rev1/shots/m7_greeting/spec.json",
+   "source_sha256": "d413aee692e44e0a0232360a7ef8c48d22c9ba200ae00043e69a875fbce1eb51"
+  },
+  "m7_gate3_rev2": {
+   "source": "storage/projects/m7_greeting/gate3_rev2/shots/m7_greeting/spec.json",
+   "source_sha256": "3bccef337bf739ae2b022cc7847b479fe1e7a1bb3c5ab0851a0d79f4045a9e38"
+  }
+ }
+}

@@ -69,6 +69,40 @@ prints `FAILED: <reason>` to stderr and exits 1:
 Re-rendering a shot does **not** remove `review/`. After any re-render, run the
 worker again with `--force` before reviewing.
 
+## Composition QA (Milestone 8)
+
+Three more fixed workers check composition from the built scene's geometry.
+They are read-only: nothing is rendered, the scene isn't changed, and encoding
+is never blocked. Run them in this order:
+
+```
+blender -b <shot-dir>/<shot_id>.blend --factory-startup --python-exit-code 1 \
+    -P blender/scripts/inspect_shot_geometry.py -- --out <shot-dir>/review/shot_geometry.json
+uv run python -m workers.shot_qa --shot-dir <shot-dir> [--accepted <accepted.json>]
+uv run python -m workers.composition_sheet --shot-dir <shot-dir> [--include-info] [--force]
+```
+
+| Output (in `review/`) | Contents |
+|---|---|
+| `shot_geometry.json` (`shot_geometry.v1`) | Per frame: camera, active shot, projected outlines of every object and character part |
+| `composition_report.json` (`composition_report.v1`) | Findings: `rule`, `severity`, `shot_id`, `frames`, `objects`, `measured`, `threshold`, `evidence.worst_frame`, `accepted`; plus `rules` and `limitations` |
+| `composition_sheet.png` + `composition_sheet.json` (`composition_sheet.v1`) | One tile per error or warning: a rendered frame from the finding's range, with the involved part outlined thick in the severity colour (red error, amber warning), the rest of the object thin white and the frame edge for slivers. The caption gives the finding ID, rule, severity, frames, frame shown and measured values. The index records the frame and outlines of every tile |
+
+- Like the frame report, these are **evidence only**
+  (`"verdict": "evidence_only"`, `"human_approval_required": true`). A finding
+  is a measured hint; no finding doesn't mean good composition.
+- Check every tile in the frame itself. If a tile says "NO RENDERED FRAME",
+  no frame in that range was rendered (e.g. a smoke render), so the outlines
+  are on a plain background. Look at a full render before deciding.
+- **`info`** findings, such as a limb sliding past an object, are counted in
+  the sheet header and drawn only with `--include-info`.
+- **Accepted** findings keep their severity and evidence, and are still
+  drawn, with `accepted: {kind, reason}`. `accepted_issue` means a human
+  accepted a real issue; `false_positive` means the finding itself is wrong.
+  Only a human adds acceptances, in the `--accepted` file. Never use one to
+  silence a finding nobody has looked at.
+- Write each open error or warning down as a finding, or get it accepted.
+
 ## Evidence
 
 Paths are relative to the shot directory unless stated.

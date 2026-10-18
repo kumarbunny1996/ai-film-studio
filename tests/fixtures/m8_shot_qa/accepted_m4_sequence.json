@@ -1,0 +1,34 @@
+[
+ {
+  "frames": [
+   80,
+   88
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "pillar_left",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "A 1% sliver of the left pillar at the left edge at the end of the tracking shot. Real but tiny; part of the approved M4/M5 example.",
+  "rule": "edge_sliver",
+  "shot_id": "sh02_track"
+ },
+ {
+  "frames": [
+   132,
+   132
+  ],
+  "kind": "accepted_issue",
+  "objects": [
+   {
+    "id": "pillar_right",
+    "kind": "primitive"
+   }
+  ],
+  "reason": "The right pillar's edge enters at the left edge on the last frame. Real but tiny; part of the approved example.",
+  "rule": "edge_sliver",
+  "shot_id": "sh03_close"
+ }
+]
