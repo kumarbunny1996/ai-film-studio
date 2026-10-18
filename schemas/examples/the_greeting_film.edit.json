@@ -1,0 +1,26 @@
+{
+  "edit_version": "1.0",
+  "film_id": "the_greeting_film",
+  "format": {
+    "codec": "h264",
+    "pix_fmt": "yuv420p",
+    "width": 640,
+    "height": 360,
+    "fps": 24,
+    "audio": "none"
+  },
+  "clips": [
+    {
+      "clip_id": "sc01_greeting",
+      "source": "storage/projects/m7_greeting/final_rev2/m7_greeting.mp4",
+      "sha256": "a43dffc26a73796c429a60f57e44b1cd45acaf40c7c898355db9a639eb9e8098",
+      "frames": 576
+    },
+    {
+      "clip_id": "sc02_travellers_question",
+      "source": "storage/projects/m10_travellers_question/final_rev1/m10_travellers_question.mp4",
+      "sha256": "907a8a5cb0b392adb372f09e6e2778f7026e80252e7b3c23f9188ffd5ef55a4a",
+      "frames": 576
+    }
+  ]
+}

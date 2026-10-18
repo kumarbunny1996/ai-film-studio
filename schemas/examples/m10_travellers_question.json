@@ -1,0 +1,1246 @@
+{
+  "spec_version": "1.3",
+  "project_id": "milestone10_travellers_question",
+  "scene_id": "sc02",
+  "shot_id": "m10_travellers_question",
+  "description": "The Traveller's Question: continuing The Greeting, A looks toward the road ahead; B turns to lead the way, waits for A, and the two walk on together onto the road toward the low sun. Eight shots, 24 s.",
+  "render": {
+    "quality": "final",
+    "engine": "eevee",
+    "resolution": [
+      640,
+      360
+    ],
+    "fps": 24,
+    "frame_start": 1,
+    "frame_end": 576,
+    "samples": 16,
+    "motion_blur": false,
+    "seed": 0
+  },
+  "environment": {
+    "world_color": [
+      0.55,
+      0.42,
+      0.32
+    ]
+  },
+  "lighting": {
+    "preset": "golden_hour",
+    "sun_elevation_deg": 14,
+    "sun_azimuth_deg": 10
+  },
+  "characters": [
+    {
+      "name": "host",
+      "asset_id": "mannequin_ochre",
+      "transform": {
+        "location": [
+          2.0,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          -50.0
+        ]
+      },
+      "motion_path": [
+        {
+          "frame": 209,
+          "location": [
+            2.0,
+            0.0,
+            0.0
+          ],
+          "rotation_z_deg": -50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 210,
+          "location": [
+            1.996875,
+            -0.002807,
+            0.0
+          ],
+          "rotation_z_deg": -49.879808,
+          "easing": "linear"
+        },
+        {
+          "frame": 211,
+          "location": [
+            1.987498,
+            -0.011227,
+            0.0
+          ],
+          "rotation_z_deg": -49.519231,
+          "easing": "linear"
+        },
+        {
+          "frame": 212,
+          "location": [
+            1.971871,
+            -0.02526,
+            0.0
+          ],
+          "rotation_z_deg": -48.918269,
+          "easing": "linear"
+        },
+        {
+          "frame": 213,
+          "location": [
+            1.949992,
+            -0.044906,
+            0.0
+          ],
+          "rotation_z_deg": -48.076923,
+          "easing": "linear"
+        },
+        {
+          "frame": 214,
+          "location": [
+            1.921863,
+            -0.070166,
+            0.0
+          ],
+          "rotation_z_deg": -46.995192,
+          "easing": "linear"
+        },
+        {
+          "frame": 215,
+          "location": [
+            1.888263,
+            -0.101852,
+            0.0
+          ],
+          "rotation_z_deg": -45.673077,
+          "easing": "linear"
+        },
+        {
+          "frame": 216,
+          "location": [
+            1.850171,
+            -0.140981,
+            0.0
+          ],
+          "rotation_z_deg": -44.110577,
+          "easing": "linear"
+        },
+        {
+          "frame": 217,
+          "location": [
+            1.806218,
+            -0.18613,
+            0.0
+          ],
+          "rotation_z_deg": -42.307692,
+          "easing": "linear"
+        },
+        {
+          "frame": 221,
+          "location": [
+            1.719123,
+            -0.288522,
+            0.0
+          ],
+          "rotation_z_deg": -38.461538,
+          "easing": "linear"
+        },
+        {
+          "frame": 225,
+          "location": [
+            1.639093,
+            -0.396524,
+            0.0
+          ],
+          "rotation_z_deg": -34.615385,
+          "easing": "linear"
+        },
+        {
+          "frame": 229,
+          "location": [
+            1.566488,
+            -0.509652,
+            0.0
+          ],
+          "rotation_z_deg": -30.769231,
+          "easing": "linear"
+        },
+        {
+          "frame": 233,
+          "location": [
+            1.501635,
+            -0.627395,
+            0.0
+          ],
+          "rotation_z_deg": -26.923077,
+          "easing": "linear"
+        },
+        {
+          "frame": 237,
+          "location": [
+            1.444825,
+            -0.749223,
+            0.0
+          ],
+          "rotation_z_deg": -23.076923,
+          "easing": "linear"
+        },
+        {
+          "frame": 241,
+          "location": [
+            1.396316,
+            -0.874587,
+            0.0
+          ],
+          "rotation_z_deg": -19.230769,
+          "easing": "linear"
+        },
+        {
+          "frame": 245,
+          "location": [
+            1.356325,
+            -1.002923,
+            0.0
+          ],
+          "rotation_z_deg": -15.384615,
+          "easing": "linear"
+        },
+        {
+          "frame": 249,
+          "location": [
+            1.325032,
+            -1.133653,
+            0.0
+          ],
+          "rotation_z_deg": -11.538462,
+          "easing": "linear"
+        },
+        {
+          "frame": 253,
+          "location": [
+            1.302579,
+            -1.266186,
+            0.0
+          ],
+          "rotation_z_deg": -7.692308,
+          "easing": "linear"
+        },
+        {
+          "frame": 257,
+          "location": [
+            1.289067,
+            -1.399928,
+            0.0
+          ],
+          "rotation_z_deg": -3.846154,
+          "easing": "linear"
+        },
+        {
+          "frame": 261,
+          "location": [
+            1.284556,
+            -1.534275,
+            0.0
+          ],
+          "rotation_z_deg": 0.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 265,
+          "location": [
+            1.289067,
+            -1.668621,
+            0.0
+          ],
+          "rotation_z_deg": 3.846154,
+          "easing": "linear"
+        },
+        {
+          "frame": 269,
+          "location": [
+            1.302579,
+            -1.802363,
+            0.0
+          ],
+          "rotation_z_deg": 7.692308,
+          "easing": "linear"
+        },
+        {
+          "frame": 273,
+          "location": [
+            1.325032,
+            -1.934897,
+            0.0
+          ],
+          "rotation_z_deg": 11.538462,
+          "easing": "linear"
+        },
+        {
+          "frame": 277,
+          "location": [
+            1.356325,
+            -2.065626,
+            0.0
+          ],
+          "rotation_z_deg": 15.384615,
+          "easing": "linear"
+        },
+        {
+          "frame": 281,
+          "location": [
+            1.396316,
+            -2.193962,
+            0.0
+          ],
+          "rotation_z_deg": 19.230769,
+          "easing": "linear"
+        },
+        {
+          "frame": 285,
+          "location": [
+            1.444825,
+            -2.319326,
+            0.0
+          ],
+          "rotation_z_deg": 23.076923,
+          "easing": "linear"
+        },
+        {
+          "frame": 289,
+          "location": [
+            1.501635,
+            -2.441154,
+            0.0
+          ],
+          "rotation_z_deg": 26.923077,
+          "easing": "linear"
+        },
+        {
+          "frame": 293,
+          "location": [
+            1.566488,
+            -2.558897,
+            0.0
+          ],
+          "rotation_z_deg": 30.769231,
+          "easing": "linear"
+        },
+        {
+          "frame": 297,
+          "location": [
+            1.639093,
+            -2.672025,
+            0.0
+          ],
+          "rotation_z_deg": 34.615385,
+          "easing": "linear"
+        },
+        {
+          "frame": 301,
+          "location": [
+            1.719123,
+            -2.780028,
+            0.0
+          ],
+          "rotation_z_deg": 38.461538,
+          "easing": "linear"
+        },
+        {
+          "frame": 305,
+          "location": [
+            1.806218,
+            -2.882419,
+            0.0
+          ],
+          "rotation_z_deg": 42.307692,
+          "easing": "linear"
+        },
+        {
+          "frame": 309,
+          "location": [
+            1.899984,
+            -2.978737,
+            0.0
+          ],
+          "rotation_z_deg": 46.153846,
+          "easing": "linear"
+        },
+        {
+          "frame": 313,
+          "location": [
+            2.0,
+            -3.068549,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 385,
+          "location": [
+            3.853523,
+            -4.62384,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 409,
+          "location": [
+            3.853523,
+            -4.62384,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 410,
+          "location": [
+            3.856741,
+            -4.62654,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 411,
+          "location": [
+            3.866395,
+            -4.634641,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 412,
+          "location": [
+            3.882484,
+            -4.648141,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 413,
+          "location": [
+            3.90501,
+            -4.667043,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 414,
+          "location": [
+            3.933971,
+            -4.691344,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 415,
+          "location": [
+            3.969368,
+            -4.721046,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 416,
+          "location": [
+            4.011201,
+            -4.756148,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 417,
+          "location": [
+            4.05947,
+            -4.79665,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 576,
+          "location": [
+            8.152668,
+            -8.231251,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "mannequin_idle",
+          "start_frame": 1,
+          "end_frame": 576,
+          "blend_in": 0
+        },
+        {
+          "action_id": "mannequin_look",
+          "start_frame": 1,
+          "end_frame": 25,
+          "blend_in": 6
+        },
+        {
+          "action_id": "mannequin_walk",
+          "start_frame": 209,
+          "end_frame": 385,
+          "blend_in": 8
+        },
+        {
+          "action_id": "mannequin_idle",
+          "start_frame": 385,
+          "end_frame": 409,
+          "blend_in": 8
+        },
+        {
+          "action_id": "mannequin_walk",
+          "start_frame": 409,
+          "end_frame": 576,
+          "blend_in": 8
+        }
+      ]
+    },
+    {
+      "name": "traveller",
+      "asset_id": "mannequin",
+      "transform": {
+        "location": [
+          -0.2,
+          0.0,
+          0.0
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          90.0
+        ]
+      },
+      "motion_path": [
+        {
+          "frame": 249,
+          "location": [
+            -0.2,
+            0.0,
+            0.0
+          ],
+          "rotation_z_deg": 90.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 250,
+          "location": [
+            -0.195802,
+            -0.000147,
+            0.0
+          ],
+          "rotation_z_deg": 89.875,
+          "easing": "linear"
+        },
+        {
+          "frame": 251,
+          "location": [
+            -0.183207,
+            -0.000586,
+            0.0
+          ],
+          "rotation_z_deg": 89.5,
+          "easing": "linear"
+        },
+        {
+          "frame": 252,
+          "location": [
+            -0.162217,
+            -0.001319,
+            0.0
+          ],
+          "rotation_z_deg": 88.875,
+          "easing": "linear"
+        },
+        {
+          "frame": 253,
+          "location": [
+            -0.132829,
+            -0.002345,
+            0.0
+          ],
+          "rotation_z_deg": 88.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 254,
+          "location": [
+            -0.095046,
+            -0.003665,
+            0.0
+          ],
+          "rotation_z_deg": 86.875,
+          "easing": "linear"
+        },
+        {
+          "frame": 255,
+          "location": [
+            -0.048948,
+            -0.006447,
+            0.0
+          ],
+          "rotation_z_deg": 85.5,
+          "easing": "linear"
+        },
+        {
+          "frame": 256,
+          "location": [
+            0.005362,
+            -0.012156,
+            0.0
+          ],
+          "rotation_z_deg": 83.875,
+          "easing": "linear"
+        },
+        {
+          "frame": 257,
+          "location": [
+            0.068027,
+            -0.018742,
+            0.0
+          ],
+          "rotation_z_deg": 82.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 261,
+          "location": [
+            0.200407,
+            -0.042084,
+            0.0
+          ],
+          "rotation_z_deg": 78.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 265,
+          "location": [
+            0.330836,
+            -0.074604,
+            0.0
+          ],
+          "rotation_z_deg": 74.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 269,
+          "location": [
+            0.458679,
+            -0.116143,
+            0.0
+          ],
+          "rotation_z_deg": 70.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 273,
+          "location": [
+            0.583314,
+            -0.166498,
+            0.0
+          ],
+          "rotation_z_deg": 66.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 277,
+          "location": [
+            0.704132,
+            -0.225425,
+            0.0
+          ],
+          "rotation_z_deg": 62.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 281,
+          "location": [
+            0.820545,
+            -0.292637,
+            0.0
+          ],
+          "rotation_z_deg": 58.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 285,
+          "location": [
+            0.931986,
+            -0.367805,
+            0.0
+          ],
+          "rotation_z_deg": 54.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 289,
+          "location": [
+            1.037913,
+            -0.450563,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        },
+        {
+          "frame": 576,
+          "location": [
+            8.426263,
+            -6.650126,
+            0.0
+          ],
+          "rotation_z_deg": 50.0,
+          "easing": "linear"
+        }
+      ],
+      "actions": [
+        {
+          "action_id": "mannequin_idle",
+          "start_frame": 1,
+          "end_frame": 576,
+          "blend_in": 0
+        },
+        {
+          "action_id": "mannequin_look",
+          "start_frame": 105,
+          "end_frame": 129,
+          "blend_in": 6
+        },
+        {
+          "action_id": "mannequin_walk",
+          "start_frame": 249,
+          "end_frame": 576,
+          "blend_in": 8
+        }
+      ]
+    }
+  ],
+  "props": [
+    {
+      "name": "baton",
+      "asset_id": "mannequin_baton",
+      "parent": "host",
+      "parent_bone": "hand.L",
+      "transform": {
+        "rotation_deg": [
+          180.0,
+          0.0,
+          0.0
+        ]
+      }
+    }
+  ],
+  "primitives": [
+    {
+      "name": "ground",
+      "shape": "plane",
+      "size": 100,
+      "material": {
+        "base_color": [
+          0.2,
+          0.22,
+          0.12
+        ],
+        "roughness": 0.95
+      }
+    },
+    {
+      "name": "lamp_post",
+      "shape": "cylinder",
+      "size": 3.2,
+      "transform": {
+        "location": [
+          3.6,
+          0.4,
+          1.6
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.05,
+          0.05,
+          0.06
+        ],
+        "roughness": 0.4,
+        "metallic": 0.6
+      },
+      "keys": [
+        {
+          "frame": 1,
+          "scale": [
+            0.06,
+            0.06,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lamp_globe",
+      "shape": "sphere",
+      "size": 0.34,
+      "transform": {
+        "location": [
+          3.6,
+          0.4,
+          3.3
+        ]
+      },
+      "material": {
+        "base_color": [
+          1.0,
+          0.8,
+          0.5
+        ],
+        "roughness": 0.3
+      }
+    },
+    {
+      "name": "tree1_trunk",
+      "shape": "cylinder",
+      "size": 1.2,
+      "transform": {
+        "location": [
+          -4.0,
+          9.0,
+          0.6
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.18,
+          0.11,
+          0.06
+        ],
+        "roughness": 0.9
+      },
+      "keys": [
+        {
+          "frame": 1,
+          "scale": [
+            0.25,
+            0.25,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tree1_crown",
+      "shape": "cone",
+      "size": 3.0,
+      "transform": {
+        "location": [
+          -4.0,
+          9.0,
+          2.6
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.1,
+          0.2,
+          0.08
+        ],
+        "roughness": 0.9
+      }
+    },
+    {
+      "name": "tree2_trunk",
+      "shape": "cylinder",
+      "size": 1.2,
+      "transform": {
+        "location": [
+          7.0,
+          17.0,
+          0.6
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.18,
+          0.11,
+          0.06
+        ],
+        "roughness": 0.9
+      },
+      "keys": [
+        {
+          "frame": 1,
+          "scale": [
+            0.25,
+            0.25,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tree2_crown",
+      "shape": "cone",
+      "size": 3.6,
+      "transform": {
+        "location": [
+          7.0,
+          17.0,
+          2.9
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.1,
+          0.2,
+          0.08
+        ],
+        "roughness": 0.9
+      }
+    },
+    {
+      "name": "tree3_trunk",
+      "shape": "cylinder",
+      "size": 1.2,
+      "transform": {
+        "location": [
+          -1.0,
+          14.0,
+          0.6
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.18,
+          0.11,
+          0.06
+        ],
+        "roughness": 0.9
+      },
+      "keys": [
+        {
+          "frame": 1,
+          "scale": [
+            0.25,
+            0.25,
+            1.0
+          ]
+        }
+      ]
+    },
+    {
+      "name": "tree3_crown",
+      "shape": "cone",
+      "size": 3.2,
+      "transform": {
+        "location": [
+          -1.0,
+          14.0,
+          2.7
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.1,
+          0.2,
+          0.08
+        ],
+        "roughness": 0.9
+      }
+    },
+    {
+      "name": "road",
+      "shape": "plane",
+      "size": 1.0,
+      "transform": {
+        "location": [
+          26.7652,
+          -22.9417,
+          0.01
+        ],
+        "rotation_deg": [
+          0.0,
+          0.0,
+          -40.0
+        ]
+      },
+      "material": {
+        "base_color": [
+          0.36,
+          0.3,
+          0.2
+        ],
+        "roughness": 0.95
+      },
+      "keys": [
+        {
+          "frame": 1,
+          "scale": [
+            53.5,
+            2.6,
+            1.0
+          ]
+        }
+      ]
+    }
+  ],
+  "shots": [
+    {
+      "shot_id": "sh01_question_wide",
+      "frame_start": 1,
+      "frame_end": 96,
+      "camera": {
+        "shot_size": "wide",
+        "lens_mm": 26,
+        "look_at": "host",
+        "look_at_height": 1.0,
+        "keys": [
+          {
+            "frame": 1,
+            "location": [
+              -3.2,
+              -7.2,
+              1.45
+            ]
+          },
+          {
+            "frame": 96,
+            "location": [
+              -3.0,
+              -6.8,
+              1.42
+            ]
+          }
+        ],
+        "dof_enabled": false,
+        "framing": {
+          "subject_offset": [
+            0.15,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "shot_id": "sh02_traveller_question",
+      "frame_start": 97,
+      "frame_end": 132,
+      "camera": {
+        "shot_size": "medium",
+        "lens_mm": 45,
+        "look_at": "traveller",
+        "look_at_height": 1.4,
+        "keys": [
+          {
+            "frame": 97,
+            "location": [
+              0.9,
+              -2.5,
+              1.35
+            ]
+          }
+        ],
+        "dof_enabled": true,
+        "framing": {
+          "subject_offset": [
+            -0.17,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "shot_id": "sh02b_road_ahead",
+      "frame_start": 133,
+      "frame_end": 168,
+      "camera": {
+        "shot_size": "wide",
+        "lens_mm": 60,
+        "keys": [
+          {
+            "frame": 133,
+            "location": [
+              0.0,
+              -0.6,
+              1.6
+            ],
+            "rotation_deg": [
+              90.0,
+              0.0,
+              -130.0
+            ]
+          }
+        ],
+        "dof_enabled": false
+      }
+    },
+    {
+      "shot_id": "sh03_host_response",
+      "frame_start": 169,
+      "frame_end": 240,
+      "camera": {
+        "shot_size": "medium",
+        "lens_mm": 40,
+        "look_at": "host",
+        "look_at_height": 1.0,
+        "keys": [
+          {
+            "frame": 169,
+            "location": [
+              5.25,
+              -4.25,
+              1.5
+            ]
+          }
+        ],
+        "dof_enabled": true,
+        "framing": {
+          "subject_offset": [
+            0.2,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "shot_id": "sh04_host_leads",
+      "frame_start": 241,
+      "frame_end": 288,
+      "camera": {
+        "shot_size": "wide",
+        "lens_mm": 40,
+        "look_at": "host",
+        "look_at_height": 1.0,
+        "keys": [
+          {
+            "frame": 241,
+            "location": [
+              -0.5,
+              -7.5,
+              3.0
+            ]
+          }
+        ],
+        "dof_enabled": false,
+        "framing": {
+          "subject_offset": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "shot_id": "sh04b_road_insert",
+      "frame_start": 289,
+      "frame_end": 336,
+      "camera": {
+        "shot_size": "wide",
+        "lens_mm": 35,
+        "keys": [
+          {
+            "frame": 289,
+            "location": [
+              2.025,
+              -6.921,
+              2.5
+            ],
+            "rotation_deg": [
+              72.0,
+              0.0,
+              -120.0
+            ]
+          }
+        ],
+        "dof_enabled": false
+      }
+    },
+    {
+      "shot_id": "sh05_catch_up",
+      "frame_start": 337,
+      "frame_end": 456,
+      "camera": {
+        "shot_size": "medium",
+        "lens_mm": 32,
+        "look_at": "traveller",
+        "look_at_height": 1.0,
+        "keys": [
+          {
+            "frame": 337,
+            "location": [
+              -2.794,
+              -4.415,
+              1.4
+            ],
+            "easing": "linear"
+          },
+          {
+            "frame": 456,
+            "location": [
+              0.27,
+              -6.986,
+              1.4
+            ]
+          }
+        ],
+        "dof_enabled": true,
+        "framing": {
+          "subject_offset": [
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    {
+      "shot_id": "sh06_together_wide",
+      "frame_start": 457,
+      "frame_end": 576,
+      "camera": {
+        "shot_size": "wide",
+        "lens_mm": 55,
+        "look_at": "host",
+        "look_at_height": 1.0,
+        "keys": [
+          {
+            "frame": 457,
+            "location": [
+              1.0,
+              -12.0,
+              1.5
+            ]
+          }
+        ],
+        "dof_enabled": false,
+        "framing": {
+          "subject_offset": [
+            -0.1,
+            0.0
+          ]
+        }
+      }
+    }
+  ]
+}
