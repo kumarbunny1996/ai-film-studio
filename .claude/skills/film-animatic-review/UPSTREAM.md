@@ -82,3 +82,8 @@ Updated for Milestone 8 (Shot QA, project branch `milestone-8-shot-qa`):
   `workers.shot_qa` and `workers.composition_sheet`, their `review/` outputs,
   evidence-only semantics, and what `info`, `accepted_issue` and
   `false_positive` mean.
+
+Updated for Milestone 9 (film assembly, project branch `milestone-9-film-assembly`):
+
+- A Film assembly section: the fixed worker `workers.assemble_film`, its EditList input,
+  outputs and no-overwrite policy, and that a verified film still needs human approval.

@@ -103,6 +103,34 @@ uv run python -m workers.composition_sheet --shot-dir <shot-dir> [--include-info
   silence a finding nobody has looked at.
 - Write each open error or warning down as a finding, or get it accepted.
 
+## Film assembly (Milestone 9)
+
+Approved scenes are joined into one film by a fixed worker, from an EditList 1.0
+(`apps/api/schemas/edit_list.py`, example `schemas/examples/greeting_reel.edit.json`):
+
+```
+uv run python -m workers.assemble_film --edit <edit.json>
+```
+
+- **What goes in.** Each clip is a scene MP4 from `run_milestone1` under
+  `storage/projects/`. It is pinned by SHA-256 and must have an approved sibling
+  `<name>.summary.json` (`ok: true`).
+- **No conversion.** The video is copied, never re-encoded. Clips that differ in format or
+  stream parameters are refused; the worker never converts them. There are no trims,
+  transitions, titles or audio.
+- **What comes out.** It writes `storage/projects/<film_id>/<film_id>.mp4`,
+  `<film_id>.assembly.ffmpeg.log` and `<film_id>.assembly.json` (`assembly_report.v1`,
+  `status: "verified"`). This happens only after the film's frame count, duration and decoded
+  frame checksums (in edit order) are verified.
+- **No overwriting.** It never overwrites. If any output exists, it refuses, and there is no
+  `--force`. A failure publishes nothing and prints a `status: "failed"` report with its
+  `stage` and `errors`.
+- **Never edit the edit list to make a run pass.** A SHA-256 mismatch means the scene changed
+  since it was approved: re-review the scene, then update the pin by hand.
+- **Verified is not approved.** It means the film is exactly the approved clips in order. A
+  human still watches the film, at least around every scene boundary (`clips[].film_frames`
+  in the report), and approves it.
+
 ## Evidence
 
 Paths are relative to the shot directory unless stated.

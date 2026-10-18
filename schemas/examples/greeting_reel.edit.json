@@ -1,0 +1,26 @@
+{
+  "edit_version": "1.0",
+  "film_id": "greeting_reel",
+  "format": {
+    "codec": "h264",
+    "pix_fmt": "yuv420p",
+    "width": 640,
+    "height": 360,
+    "fps": 24,
+    "audio": "none"
+  },
+  "clips": [
+    {
+      "clip_id": "sc01_greeting",
+      "source": "storage/projects/m7_greeting/final_rev2/m7_greeting.mp4",
+      "sha256": "a43dffc26a73796c429a60f57e44b1cd45acaf40c7c898355db9a639eb9e8098",
+      "frames": 576
+    },
+    {
+      "clip_id": "sc02_ball_sequence",
+      "source": "storage/projects/m6_demo/m4_sequence.mp4",
+      "sha256": "23c95da547c2caa3678d0978cb7f84b9e898bfe67fa70ba8e748445665238e00",
+      "frames": 132
+    }
+  ]
+}

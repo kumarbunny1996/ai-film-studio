@@ -1,0 +1,132 @@
+{
+  "$defs": {
+    "Clip": {
+      "additionalProperties": false,
+      "properties": {
+        "clip_id": {
+          "pattern": "^[a-z][a-z0-9_]{1,47}$",
+          "title": "Clip Id",
+          "type": "string"
+        },
+        "source": {
+          "description": "relative POSIX path under storage/projects/",
+          "maxLength": 240,
+          "pattern": "^storage/projects/(?:[A-Za-z0-9_](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_-])?/)+[A-Za-z0-9_](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_-])?\\.mp4$",
+          "title": "Source",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the source file, lowercase hex",
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "frames": {
+          "description": "decoded video frames in the clip",
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Frames",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "clip_id",
+        "source",
+        "sha256",
+        "frames"
+      ],
+      "title": "Clip",
+      "type": "object"
+    },
+    "VideoFormat": {
+      "additionalProperties": false,
+      "description": "The format every clip must already have; assembly never converts.",
+      "properties": {
+        "codec": {
+          "const": "h264",
+          "description": "ffprobe codec_name",
+          "title": "Codec",
+          "type": "string"
+        },
+        "pix_fmt": {
+          "const": "yuv420p",
+          "title": "Pix Fmt",
+          "type": "string"
+        },
+        "width": {
+          "maximum": 7680,
+          "minimum": 16,
+          "title": "Width",
+          "type": "integer"
+        },
+        "height": {
+          "maximum": 4320,
+          "minimum": 16,
+          "title": "Height",
+          "type": "integer"
+        },
+        "fps": {
+          "description": "constant frame rate; ffprobe r_frame_rate N/1",
+          "enum": [
+            24,
+            25,
+            30
+          ],
+          "title": "Fps",
+          "type": "integer"
+        },
+        "audio": {
+          "const": "none",
+          "description": "1.0: clips must have no audio stream",
+          "title": "Audio",
+          "type": "string"
+        }
+      },
+      "required": [
+        "codec",
+        "pix_fmt",
+        "width",
+        "height",
+        "fps",
+        "audio"
+      ],
+      "title": "VideoFormat",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "edit_version": {
+      "const": "1.0",
+      "title": "Edit Version",
+      "type": "string"
+    },
+    "film_id": {
+      "description": "output: storage/projects/<film_id>/<film_id>.mp4",
+      "pattern": "^[a-z][a-z0-9_]{1,47}$",
+      "title": "Film Id",
+      "type": "string"
+    },
+    "format": {
+      "$ref": "#/$defs/VideoFormat"
+    },
+    "clips": {
+      "description": "in film order",
+      "items": {
+        "$ref": "#/$defs/Clip"
+      },
+      "maxItems": 1000,
+      "minItems": 1,
+      "title": "Clips",
+      "type": "array"
+    }
+  },
+  "required": [
+    "edit_version",
+    "film_id",
+    "format",
+    "clips"
+  ],
+  "title": "EditList",
+  "type": "object"
+}
