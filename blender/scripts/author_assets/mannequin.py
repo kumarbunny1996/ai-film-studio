@@ -4,14 +4,18 @@ mannequin.py — author the homemade low-poly mannequin character, its actions a
 Run headless, with no template, add-ons or network access:
 
     blender -b --factory-startup --python-exit-code 1 \
-        -P blender/scripts/author_assets/mannequin.py -- --out-root <dir> [--force]
+        -P blender/scripts/author_assets/mannequin.py -- --out-root <dir> [--set m7] [--force]
 
 Writes, under --out-root (the same layout as assets/):
     characters/mannequin.blend       collection CH-mannequin: RIG-mannequin + GEO-mannequin
     actions/mannequin_actions.blend  actions mannequin_idle (48 frames), mannequin_walk (32)
     props/mannequin_baton.blend      collection PR-mannequin_baton: GEO-mannequin_baton
 
-If any of the three files exists, nothing is written unless --force is given. Files are
+and with --set m7 (Milestone 7) instead:
+    characters/mannequin_ochre.blend collection CH-mannequin_ochre: RIG-/GEO-mannequin_ochre
+    actions/mannequin_gestures.blend actions mannequin_look (24 frames), mannequin_wave (60)
+
+If any file of the chosen set exists, nothing is written unless --force is given. Files are
 written to *.tmp.blend first and then moved into place, so a failed run never leaves a
 truncated asset.
 
@@ -39,6 +43,11 @@ Conventions (rig_type afs_mannequin_v1):
   * Idle (keyed every 6 frames): breathing in the spine, chest, head and arms; both legs stand
     still on the walk's frame-17 stance leg (soft knee, hips slightly lowered), so the walk ->
     idle crossfade leaves the planted leg unchanged and sets the swing foot straight down.
+  * Gestures (Milestone 7, keyed every frame, not loopable) key only the channels they move,
+    to be layered over a continuous idle on a higher NLA track: mannequin_look turns the
+    spine, chest, neck and head (Y rotation only) 40 deg to the character's right and holds;
+    mannequin_wave raises the right arm, swings the forearm side to side twice and lowers it
+    back to the idle's mean arm pose. Neither keys the legs or the hips.
 
 The pose tables (everything above `import bpy`) are plain Python so tests can check them
 without Blender.
@@ -56,12 +65,23 @@ CHARACTER_FILE = Path("characters/mannequin.blend")
 ACTIONS_FILE = Path("actions/mannequin_actions.blend")
 PROP_FILE = Path("props/mannequin_baton.blend")
 OUTPUTS = (CHARACTER_FILE, ACTIONS_FILE, PROP_FILE)
+# Milestone 7 set (--set m7): an ochre variant of the character and the gesture actions. The
+# Milestone 6 set above is unchanged and written only by --set m6 (the default).
+OCHRE_FILE = Path("characters/mannequin_ochre.blend")
+GESTURES_FILE = Path("actions/mannequin_gestures.blend")
+M7_OUTPUTS = (OCHRE_FILE, GESTURES_FILE)
 
 CHARACTER_COLLECTION, ARMATURE, BODY = "CH-mannequin", "RIG-mannequin", "GEO-mannequin"
 PROP_COLLECTION, PROP_OBJECT = "PR-mannequin_baton", "GEO-mannequin_baton"
 MATERIALS = {"body": ("MAT-mannequin_body", (0.62, 0.60, 0.56)),
              "accent": ("MAT-mannequin_accent", (0.12, 0.28, 0.55)),
-             "baton": ("MAT-mannequin_baton", (0.30, 0.18, 0.09))}
+             "baton": ("MAT-mannequin_baton", (0.30, 0.18, 0.09)),
+             "ochre_body": ("MAT-mannequin_ochre_body", (0.60, 0.30, 0.05)),
+             "ochre_accent": ("MAT-mannequin_ochre_accent", (0.25, 0.07, 0.03))}
+# The ochre variant: the same skeleton, body parts and rig type under its own names, so both
+# characters can share a scene and every afs_mannequin_v1 action plays on either.
+OCHRE = {"collection": "CH-mannequin_ochre", "armature": "RIG-mannequin_ochre",
+         "body": "GEO-mannequin_ochre", "materials": ("ochre_body", "ochre_accent")}
 
 # ---------------------------------------------------------------------------
 # Skeleton: name -> (parent, head, tail, connected). Metres, facing -Y.
@@ -496,6 +516,199 @@ ACTION_FRAMES = {WALK["name"]: WALK["frames"], IDLE["name"]: IDLE["frames"]}
 
 
 # ---------------------------------------------------------------------------
+# Whole-rig forward kinematics (plain Python), for the gestures and their tests
+# ---------------------------------------------------------------------------
+def rest_rotation(head, tail):
+    """Bone rest orientation with roll 0, as Blender builds it (vec_roll_to_mat3): the
+    shortest-arc rotation taking +Y onto the bone direction. Columns are the bone's X, Y, Z
+    axes in armature space. Valid away from bones pointing along -Y (none on this rig)."""
+    d = [tail[i] - head[i] for i in range(3)]
+    n = math.sqrt(sum(c * c for c in d))
+    x, y, z = (c / n for c in d)
+    t = 1.0 + y
+    return [[1 - x * x / t, x, -x * z / t],
+            [-x, y, -z],
+            [-x * z / t, z, 1 - z * z / t]]
+
+
+def _rest4(bone):
+    _, head, tail, _ = BONES[bone]
+    return _m4(rest_rotation(head, tail), head)
+
+
+def pose_matrices(rot: dict, hips_loc=(0.0, 0.0, 0.0)) -> dict:
+    """Armature-space pose matrix of every bone for local XYZ Euler rotations in degrees
+    (bones missing from `rot` stay at rest) and the hips location, by Blender's evaluation
+    pose(bone) = pose(parent) @ inv(rest(parent)) @ rest(bone) @ T(location) @ R(euler)."""
+    out = {}
+    for name, (parent, *_) in BONES.items():                  # parents come first
+        local = _m4(_euler_xyz(*rot.get(name, (0.0, 0.0, 0.0))),
+                    hips_loc if name == "hips" else (0.0, 0.0, 0.0))
+        m = _mul(_rest4(name), local)
+        if parent is not None:
+            m = _mul(_mul(out[parent], _inv_rigid(_rest4(parent))), m)
+        out[name] = m
+    return out
+
+
+def bone_points(mats: dict) -> dict:
+    """{bone: (head, tail)} in armature space from pose_matrices()."""
+    out = {}
+    for name, m in mats.items():
+        length = math.dist(BONES[name][1], BONES[name][2])
+        out[name] = ([m[i][3] for i in range(3)], [m[i][1] * length + m[i][3] for i in range(3)])
+    return out
+
+
+def _euler_from_matrix(m) -> tuple[float, float, float]:
+    """XYZ Euler (degrees) of a rotation matrix m = Rz @ Ry @ Rx."""
+    y = math.asin(max(-1.0, min(1.0, -m[2][0])))
+    return (math.degrees(math.atan2(m[2][1], m[2][2])), math.degrees(y),
+            math.degrees(math.atan2(m[1][0], m[0][0])))
+
+
+def _smootherstep(t: float) -> float:
+    t = max(0.0, min(1.0, t))
+    return t * t * t * (t * (6 * t - 15) + 10)
+
+
+# ---------------------------------------------------------------------------
+# Gestures (Milestone 7): partial-body actions layered over a continuous idle
+# ---------------------------------------------------------------------------
+# A gesture keys only the channels it moves (bone -> {Euler axis: degrees}). On a higher NLA
+# track (REPLACE) it overrides just those channels, and the idle on the track below keeps
+# driving everything else: the legs and hips, so the feet stay planted, and for the look the
+# breathing pitch (rotation_euler[0]) of the bones it turns. Gestures do not loop; after the
+# clip, NLA holds the last key (HOLD_FORWARD in build_scene.place_actions).
+LOOK = {"name": "mannequin_look", "frames": 24}
+WAVE = {"name": "mannequin_wave", "frames": 60}
+GESTURE_FRAMES = {LOOK["name"]: LOOK["frames"], WAVE["name"]: WAVE["frames"]}
+
+# Look: the head and chest turn to the character's right and hold. The spine bones point up
+# (+Z), so their local Y is world up and a negative Y rotation turns clockwise seen from above:
+# the rig faces -Y, so that is toward -X, its right. Yaw per bone relative to its parent, and
+# the frames over which each eases in (smootherstep): the head leads, the spine follows.
+LOOK_YAW_DEG = {"spine": -6.0, "chest": -10.0, "neck": -9.0, "head": -15.0}   # head world -40
+LOOK_WINDOW = {"head": (1, 11), "neck": (2, 13), "chest": (3, 15), "spine": (4, 17)}
+
+# Wave (right arm): raise the upper arm out to the side and forward, bend the elbow so the
+# forearm points up, swing the forearm side to side (elbow flexion about one horizontal axis,
+# in the vertical plane of the raised arm), then lower back to the idle's mean arm pose. The
+# raise and the lowering mirror each other: the upper arm turns along the shortest rotation
+# between the two poses, and the elbow flexes only in the second part of the raise (and
+# straightens first when lowering), so the hand stays in front of the body.
+WAVE_SIDE = "R"
+WAVE_ELEVATION_DEG = 25.0      # upper arm above horizontal
+WAVE_FORWARD_DEG = 30.0        # upper arm swung forward (-Y) from straight out to the side
+WAVE_FLEX_DEG = 60.0           # elbow flexion at the centre of the swing
+WAVE_SWING_DEG = 22.0          # forearm swing amplitude, +- about WAVE_FLEX_DEG
+WAVE_HAND_FACTOR = -0.4        # the hand counter-rotates against the swing (a loose wrist)
+WAVE_CYCLES = 2
+WAVE_RAMP = 3                  # frames over which the swing amplitude fades in and out
+# gesture key frames (inclusive): upper arm raise, elbow flex, swing, elbow straighten, lower
+WAVE_RAISE, WAVE_FLEX = (1, 19), (7, 19)
+WAVE_SWING = (19, 43)
+WAVE_UNFLEX, WAVE_LOWER = (43, 55), (43, 61)
+
+
+def _wave_upper_arm_raised() -> tuple[float, float, float]:
+    """Local Euler of the raised upper arm (chest at rest): its Y axis along the raised
+    direction and its X axis (the forearm's flexion axis) horizontal and perpendicular to it,
+    so elbow flexion swings the forearm up toward vertical in the arm's vertical plane."""
+    sx = 1.0 if WAVE_SIDE == "L" else -1.0
+    e, f = math.radians(WAVE_ELEVATION_DEG), math.radians(WAVE_FORWARD_DEG)
+    u = [sx * math.cos(e) * math.cos(f), -math.cos(e) * math.sin(f), math.sin(e)]
+    x = [u[1], -u[0], 0.0]                                      # u x (0, 0, 1)
+    n = math.hypot(x[0], x[1])
+    x = [c / n for c in x]
+    z = [x[1] * u[2] - x[2] * u[1], x[2] * u[0] - x[0] * u[2], x[0] * u[1] - x[1] * u[0]]
+    target = _cols(x, u, z)
+    _, head, tail, _ = BONES[f"upper_arm.{WAVE_SIDE}"]
+    r0 = rest_rotation(head, tail)
+    local = [[sum(r0[k][i] * target[k][j] for k in range(3)) for j in range(3)] for i in range(3)]
+    return _euler_from_matrix(local)
+
+
+WAVE_UPPER_ARM_DEG = _wave_upper_arm_raised()
+# the idle's arm pose averaged over its cycle: upper arm 1.0 cos(.) about X averages to 0
+IDLE_ARM_MEAN = {"upper_arm": (0.0, 0.0, 0.0), "forearm": (FORWARD * ELBOW_DEG, 0.0, 0.0),
+                 "hand": (0.0, 0.0, 0.0)}
+
+
+def _axis_angle(m) -> tuple[list[float], float]:
+    """Unit axis and angle (rad) of a rotation matrix whose angle is below 180 degrees."""
+    angle = math.acos(max(-1.0, min(1.0, (m[0][0] + m[1][1] + m[2][2] - 1) / 2)))
+    if angle < 1e-12:
+        return [1.0, 0.0, 0.0], 0.0
+    v = [m[2][1] - m[1][2], m[0][2] - m[2][0], m[1][0] - m[0][1]]
+    n = math.sqrt(sum(c * c for c in v))
+    return [c / n for c in v], angle
+
+
+def _rotation(axis, angle):
+    x, y, z = axis
+    c, s, k = math.cos(angle), math.sin(angle), 1 - math.cos(angle)
+    return [[c + x * x * k, x * y * k - z * s, x * z * k + y * s],
+            [y * x * k + z * s, c + y * y * k, y * z * k - x * s],
+            [z * x * k - y * s, z * y * k + x * s, c + z * z * k]]
+
+
+_WAVE_AXIS, _WAVE_ANGLE = _axis_angle(_euler_xyz(*WAVE_UPPER_ARM_DEG))
+
+
+def wave_upper_arm(t: float) -> tuple[float, float, float]:
+    """Upper-arm local Euler a fraction t of the way from the idle's mean arm (rest) to the
+    raised arm, along the shortest rotation between them (a quaternion slerp). The Euler values
+    themselves are not blended: the raised pose is near the XYZ gimbal (Y about -77 deg), and
+    a straight Euler blend swings the hand out behind the body."""
+    return _euler_from_matrix(_rotation(_WAVE_AXIS, t * _WAVE_ANGLE))
+
+
+def _window(f: float, w: tuple[int, int]) -> float:
+    return _smootherstep((f - w[0]) / (w[1] - w[0]))
+
+
+def look_keys() -> list[tuple[int, dict]]:
+    out = []
+    for f in range(1, LOOK["frames"] + 2):
+        rot = {}
+        for bone, yaw in LOOK_YAW_DEG.items():
+            a, b = LOOK_WINDOW[bone]
+            rot[bone] = {1: _r(yaw * _smootherstep((f - a) / (b - a)))}
+        out.append((f, rot))
+    return out
+
+
+def wave_arm(f: float) -> dict:
+    """Local Euler (degrees) of the waving arm's three bones at gesture frame f."""
+    s = WAVE_SIDE
+    if WAVE_SWING[0] < f < WAVE_SWING[1]:
+        u = f - WAVE_SWING[0]
+        n = WAVE_SWING[1] - WAVE_SWING[0]
+        env = _smootherstep(u / WAVE_RAMP) * _smootherstep((n - u) / WAVE_RAMP)
+        swing = WAVE_SWING_DEG * env * math.sin(2 * math.pi * WAVE_CYCLES * u / n)
+        return {f"upper_arm.{s}": list(WAVE_UPPER_ARM_DEG),
+                f"forearm.{s}": [WAVE_FLEX_DEG + swing, 0.0, 0.0],
+                f"hand.{s}": [WAVE_HAND_FACTOR * swing, 0.0, 0.0]}
+    if f <= WAVE_SWING[0]:
+        t, ft = _window(f, WAVE_RAISE), _window(f, WAVE_FLEX)
+    else:
+        t, ft = 1.0 - _window(f, WAVE_LOWER), 1.0 - _window(f, WAVE_UNFLEX)
+    flex = IDLE_ARM_MEAN["forearm"][0] + ft * (WAVE_FLEX_DEG - IDLE_ARM_MEAN["forearm"][0])
+    return {f"upper_arm.{s}": list(wave_upper_arm(t)),
+            f"forearm.{s}": [flex, 0.0, 0.0], f"hand.{s}": list(IDLE_ARM_MEAN["hand"])}
+
+
+def wave_keys() -> list[tuple[int, dict]]:
+    return [(f, {bone: {i: _r(v) for i, v in enumerate(rot)} for bone, rot in wave_arm(f).items()})
+            for f in range(1, WAVE["frames"] + 2)]
+
+
+def gestures() -> dict[str, list[tuple[int, dict]]]:
+    return {LOOK["name"]: look_keys(), WAVE["name"]: wave_keys()}
+
+
+# ---------------------------------------------------------------------------
 # Blender authoring (imports bpy lazily so the tables above stay testable without Blender)
 # ---------------------------------------------------------------------------
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -503,6 +716,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--out-root", required=True, type=Path,
                    help="directory to write characters/, actions/ and props/ into")
     p.add_argument("--force", action="store_true", help="overwrite existing output files")
+    p.add_argument("--set", choices=("m6", "m7"), default="m6",
+                   help="m6: character, walk/idle actions, baton (default); "
+                        "m7: ochre character variant and gesture actions")
     return p.parse_args(argv)
 
 
@@ -534,11 +750,11 @@ def _part_matrix(shape: str, dims, head, tail):
     return Matrix.Translation(mid) @ rot
 
 
-def _build_character(bpy, coll):
+def _build_character(bpy, coll, armature=ARMATURE, body_name=BODY, materials=("body", "accent")):
     import bmesh
 
-    arm_data = bpy.data.armatures.new(ARMATURE)
-    rig = bpy.data.objects.new(ARMATURE, arm_data)
+    arm_data = bpy.data.armatures.new(armature)
+    rig = bpy.data.objects.new(armature, arm_data)
     coll.objects.link(rig)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.mode_set(mode="EDIT")
@@ -554,14 +770,14 @@ def _build_character(bpy, coll):
     for pb in rig.pose.bones:
         pb.rotation_mode = "XYZ"
 
-    mesh = bpy.data.meshes.new(BODY)
-    body = bpy.data.objects.new(BODY, mesh)
+    mesh = bpy.data.meshes.new(body_name)
+    body = bpy.data.objects.new(body_name, mesh)
     coll.objects.link(body)
     body.parent = rig
     groups = {name: body.vertex_groups.new(name=name).index for name in BONES}
     mod = body.modifiers.new("Armature", "ARMATURE")
     mod.object = rig
-    mats = [_material(bpy, "body"), _material(bpy, "accent")]
+    mats = [_material(bpy, key) for key in materials]
     for m in mats:
         mesh.materials.append(m)
 
@@ -614,6 +830,27 @@ def _author_actions(bpy, rig) -> list:
     return out
 
 
+def _author_gestures(bpy, rig) -> list:
+    """Key only the channels each gesture moves (one F-curve per bone and Euler axis), so the
+    action layers over an idle on a lower NLA track."""
+    ad = rig.animation_data_create()
+    out = []
+    for name, keys in gestures().items():
+        act = bpy.data.actions.new(name)
+        ad.action = act
+        for frame, rot in keys:
+            for bone, axes in rot.items():
+                pb = rig.pose.bones[bone]
+                for axis, deg in axes.items():
+                    pb.rotation_euler[axis] = math.radians(deg)
+                    pb.keyframe_insert("rotation_euler", index=axis, frame=frame, group=bone)
+        act.use_frame_range = True
+        act.frame_start, act.frame_end = keys[0][0], keys[-1][0]
+        out.append(act)
+    rig.animation_data_clear()
+    return out
+
+
 def _build_prop(bpy, coll):
     import bmesh
     from mathutils import Matrix
@@ -642,7 +879,8 @@ def _write(bpy, root: Path, rel: Path, datablocks: set) -> tuple[Path, Path]:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     root = args.out_root.resolve()
-    existing = [str(root / rel) for rel in OUTPUTS if (root / rel).exists()]
+    outputs = OUTPUTS if args.set == "m6" else M7_OUTPUTS
+    existing = [str(root / rel) for rel in outputs if (root / rel).exists()]
     if existing and not args.force:
         print(f"[mannequin] REFUSED: output exists (pass --force to overwrite): {existing}",
               file=sys.stderr)
@@ -651,6 +889,8 @@ def main(argv: list[str]) -> int:
     import bpy
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
+    if args.set == "m7":
+        return _main_m7(bpy, root)
     scene = bpy.context.scene
     char_coll = bpy.data.collections.new(CHARACTER_COLLECTION)
     prop_coll = bpy.data.collections.new(PROP_COLLECTION)
@@ -672,8 +912,36 @@ def main(argv: list[str]) -> int:
         for tmp, _ in written:
             if tmp.exists():
                 tmp.unlink()
+    _report(written)
+    return 0
+
+
+def _report(written: list) -> None:
     for _, final in written:
         print(f"[mannequin] wrote {final}")
+
+
+def _main_m7(bpy, root: Path) -> int:
+    """The ochre variant and the gestures. The gestures are keyed on a rig named ARMATURE (not
+    written), so their slot is OBRIG-mannequin, the same as the walk and idle."""
+    scene = bpy.context.scene
+    ochre_coll = bpy.data.collections.new(OCHRE["collection"])
+    work_coll = bpy.data.collections.new("WORK-gesture_rig")
+    scene.collection.children.link(ochre_coll)
+    scene.collection.children.link(work_coll)
+    _build_character(bpy, ochre_coll, OCHRE["armature"], OCHRE["body"], OCHRE["materials"])
+    acts = _author_gestures(bpy, _build_character(bpy, work_coll))
+    written = []
+    try:
+        written.append(_write(bpy, root, OCHRE_FILE, {ochre_coll}))
+        written.append(_write(bpy, root, GESTURES_FILE, set(acts)))
+        for tmp, final in written:
+            os.replace(tmp, final)
+    finally:
+        for tmp, _ in written:
+            if tmp.exists():
+                tmp.unlink()
+    _report(written)
     return 0
 
 

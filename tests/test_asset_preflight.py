@@ -55,8 +55,9 @@ def test_scene_001_still_passes_validation_unchanged():
 
 
 def test_duplicate_ids_are_reported():
-    dup_asset = {**MANIFEST_RAW["assets"][-1], "file": "characters/other.blend"}
-    dup_action = {**MANIFEST_RAW["actions"][-1]}
+    by_id = lambda kind, i: next(e for e in MANIFEST_RAW[kind] if e["id"] == i)
+    dup_asset = {**by_id("assets", "mannequin_baton"), "file": "characters/other.blend"}
+    dup_action = {**by_id("actions", "mannequin_walk")}
     m = manifest(assets=MANIFEST_RAW["assets"] + [dup_asset],
                  actions=MANIFEST_RAW["actions"] + [dup_action])
     problems = manifest_problems(m, spec=M6)

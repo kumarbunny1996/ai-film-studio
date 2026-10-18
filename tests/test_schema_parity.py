@@ -19,7 +19,8 @@ from apps.api.schemas.scene_spec import SceneSpec
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = json.loads((ROOT / "schemas/scene_spec.schema.json").read_text())
 EX = {n: json.loads((ROOT / f"schemas/examples/{n}.json").read_text())
-      for n in ("scene_001", "milestone1_primitives", "m3_framing", "m4_sequence", "m6_character")}
+      for n in ("scene_001", "milestone1_primitives", "m3_framing", "m4_sequence", "m6_character",
+                "m7_greeting")}
 
 ANNOTATIONS = {"title", "description", "default"}
 SUBSCHEMA_LISTS = {"anyOf", "oneOf", "allOf", "prefixItems"}

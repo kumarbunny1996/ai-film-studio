@@ -126,10 +126,11 @@ def test_manifest_entries_match_the_authored_assets():
 
 def test_existing_manifest_entries_are_preserved():
     ids = [a.id for a in MANIFEST.assets], [a.id for a in MANIFEST.actions]
+    # Milestone 7 added mannequin_ochre (beside mannequin) and the two gestures (at the end)
     assert ids == (["shepherd_girl", "sheepdog", "walking_staff", "alpine_meadow",
-                    "sky_golden_hour", "mannequin", "mannequin_baton"],
+                    "sky_golden_hour", "mannequin", "mannequin_ochre", "mannequin_baton"],
                    ["idle_breathe", "walk_cycle", "look_around", "dog_idle", "dog_trot",
-                    "mannequin_idle", "mannequin_walk"])
+                    "mannequin_idle", "mannequin_walk", "mannequin_look", "mannequin_wave"])
 
 
 def test_mannequin_actions_are_rejected_on_other_rigs():

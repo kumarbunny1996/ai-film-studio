@@ -627,6 +627,9 @@ class ActionEntry(Strict):
     rig_type: str                              # only valid on matching rigs
     frames: int = Field(..., ge=1)             # source length (for looping maths)
     loopable: bool = False
+    # "full" keys every bone of the rig (and the root bone's location); "partial" keys only
+    # some channels, so it must be layered over a full-body clip (see validate_against_manifest)
+    coverage: Literal["full", "partial"] = "full"
 
 
 class AssetManifest(Strict):
@@ -678,6 +681,19 @@ def validate_against_manifest(spec: SceneSpec, manifest: AssetManifest) -> list[
                 errors.append(f"characters[{c.name}]: action '{clip.action_id}' is not loopable "
                               f"({act.frames} frames) but the clip asks for "
                               f"{clip.end_frame - clip.start_frame} frames")
+
+        # The builder puts the first clip, in the same stable start-frame order as
+        # build_scene.place_actions, on the bottom NLA track and holds it before and after its
+        # range, so it poses every channel on every frame. A partial-body action there would
+        # leave the bones it does not key in the rest pose wherever no full-body clip covers.
+        first = sorted(c.actions, key=lambda a: a.start_frame)[0]
+        act = manifest.action(first.action_id)
+        if act is not None and act.rig_type == entry.rig_type and act.coverage == "partial":
+            full = sorted(a.id for a in manifest.actions
+                          if a.rig_type == entry.rig_type and a.coverage == "full")
+            suggestion = f" such as {full[0]}" if full else ""
+            errors.append(f"characters[{c.name}]: first clip '{first.action_id}' is a "
+                          f"partial-body gesture; start with a full-body action{suggestion}")
 
     for p in spec.props:
         need(p.asset_id, AssetType.prop, f"props[{p.name}]")

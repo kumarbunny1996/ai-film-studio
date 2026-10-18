@@ -16,6 +16,10 @@
      "collection": "CH-mannequin", "armature": "RIG-mannequin", "rig_type": "afs_mannequin_v1",
      "bones": ["hand.R", "hand.L", "head", "chest", "hips"], "license": "own",
      "notes": "Authored by blender/scripts/author_assets/mannequin.py. 1.75 m, origin on the ground, faces -Y (motion_path rotation_z_deg 90 walks +X). Bone parenting attaches at the bone tail; hand tails are the grip points. mannequin_walk (cycle R1S) travel: 1.075379 m per 32-frame cycle = 0.033606 m/frame (0.807 m/s at 24 fps); with linear root travel at that speed the planted foot is stationary (the toe is the contact point while the heel rises before toe-off). Heels land on cycle frames 9 (left) and 25 (right); cycle frame 17 is left mid-stance, where a walk clip can end and crossfade into mannequin_idle while the root stops, without sliding."},
+    {"id": "mannequin_ochre", "type": "character", "file": "characters/mannequin_ochre.blend",
+     "collection": "CH-mannequin_ochre", "armature": "RIG-mannequin_ochre", "rig_type": "afs_mannequin_v1",
+     "bones": ["hand.R", "hand.L", "head", "chest", "hips"], "license": "own",
+     "notes": "Authored by blender/scripts/author_assets/mannequin.py --set m7. The mannequin (same skeleton, mesh, proportions and rig type, so every mannequin action plays on it) in ochre body and dark red-brown hands and feet, under its own names so it can share a scene with the grey mannequin."},
     {"id": "mannequin_baton", "type": "prop", "file": "props/mannequin_baton.blend",
      "collection": "PR-mannequin_baton", "license": "own",
      "notes": "Authored by blender/scripts/author_assets/mannequin.py. 0.9 m along local +Z, origin at the grip 0.3 m from the lower end."}
@@ -34,6 +38,12 @@
     {"id": "mannequin_idle", "file": "actions/mannequin_actions.blend", "action_name": "mannequin_idle",
      "rig_type": "afs_mannequin_v1", "frames": 48, "loopable": true},
     {"id": "mannequin_walk", "file": "actions/mannequin_actions.blend", "action_name": "mannequin_walk",
-     "rig_type": "afs_mannequin_v1", "frames": 32, "loopable": true}
+     "rig_type": "afs_mannequin_v1", "frames": 32, "loopable": true},
+    {"id": "mannequin_look", "file": "actions/mannequin_gestures.blend", "action_name": "mannequin_look",
+     "rig_type": "afs_mannequin_v1", "frames": 24, "loopable": false,
+     "coverage": "partial"},
+    {"id": "mannequin_wave", "file": "actions/mannequin_gestures.blend", "action_name": "mannequin_wave",
+     "rig_type": "afs_mannequin_v1", "frames": 60, "loopable": false,
+     "coverage": "partial"}
   ]
 }
