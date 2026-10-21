@@ -41,15 +41,14 @@ human_approval → final_render → edit → final_film
   `the_greeting_film` (48 s). Approved 2026-10-18.
 - **M11 — Readable attention** — head-direction marker tests (rev1–rev4, review round 2).
   Closed 2026-10-21: the user adopted **A** (rev3's D3 visor + nose). The test results are
-  weak (no two independent reviewers); see `docs/m11_readable_attention.md`.
-- **Tests** — 33 test modules (~9,600 lines) covering schemas, builders, assets, QA, assembly.
+  weak (no two independent reviewers); see `docs/m11_readable_attention.md`. Gate 3 added the
+  new assets `mannequin_marked` and `mannequin_ochre_marked` (`mannequin.py --set m11`); the
+  unmarked mannequins and the M7/M10 films are unchanged.
+- **Tests** — 35 test modules (~10,000 lines) covering schemas, builders, assets, QA, assembly.
 
 ## 🟨 In progress
 
-- **M11 follow-up — put marker A on the mannequin (Gate 3, needs approval).** Author A into
-  `blender/scripts/author_assets/mannequin.py`, regenerate both character assets and their
-  tests, and decide whether M7/M10 are re-rendered.
-  - The M11 scripts are now in `tools/m11_marker_test/` but **not yet committed**.
+- Nothing in progress.
 
 ## ⬜ Pending
 
@@ -95,14 +94,12 @@ human_approval → final_render → edit → final_film
 
 ## Recommended next steps
 
-1. **Finish M11 integration.** Commit `tools/m11_marker_test/` and the M11 doc, then add marker A
-   to the mannequin (Gate 3) once approved.
-2. **M12 — Thin end-to-end slice.** A 3–5 sentence story goes to the LLM, which produces a screenplay,
-   then a shot list, then a SceneSpec using only the existing mannequin, walk, idle, look and wave.
-   The existing builder renders it to an MP4. Crude output is fine; the goal is to prove the
-   "story in" step.
-3. **M13 — Blocking solver**, so the LLM describes intent (who goes where, when) and code
+1. **M12 — Thin end-to-end slice.** A 3–5 sentence story goes to the LLM, which produces a screenplay,
+   then a shot list, then a SceneSpec using only the existing mannequins (the marked variants),
+   walk, idle, look and wave. The existing builder renders it to an MP4. Crude output is fine; the
+   goal is to prove the "story in" step.
+2. **M13 — Blocking solver**, so the LLM describes intent (who goes where, when) and code
    computes coordinates.
-4. **M14 — Asset import + action library**, driven by what the M12 stories asked for and couldn't get.
-5. **M15 — Dialogue and audio.**
-6. **Then** API, queue, database and dashboard around a pipeline that already works.
+3. **M14 — Asset import + action library**, driven by what the M12 stories asked for and couldn't get.
+4. **M15 — Dialogue and audio.**
+5. **Then** API, queue, database and dashboard around a pipeline that already works.
