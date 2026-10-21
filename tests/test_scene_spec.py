@@ -54,7 +54,8 @@ def test_wrong_rig_action_reported_for_llm_retry():
 def test_unknown_asset_lists_valid_options():
     d = spec(); d["characters"][0]["asset_id"] = "knight"
     errors = validate_against_manifest(SceneSpec.model_validate(d), MANIFEST)
-    assert any("Valid: ['mannequin', 'mannequin_ochre', 'sheepdog', 'shepherd_girl']" in e
+    assert any("Valid: ['mannequin', 'mannequin_marked', 'mannequin_ochre', 'mannequin_ochre_marked', "
+               "'sheepdog', 'shepherd_girl']" in e
                for e in errors)
 
 

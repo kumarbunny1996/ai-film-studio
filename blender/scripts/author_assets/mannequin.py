@@ -15,6 +15,10 @@ and with --set m7 (Milestone 7) instead:
     characters/mannequin_ochre.blend collection CH-mannequin_ochre: RIG-/GEO-mannequin_ochre
     actions/mannequin_gestures.blend actions mannequin_look (24 frames), mannequin_wave (60)
 
+and with --set m11 (Milestone 11) instead, both characters with head marker A (MARKER_A):
+    characters/mannequin_marked.blend        collection CH-mannequin_marked
+    characters/mannequin_ochre_marked.blend  collection CH-mannequin_ochre_marked
+
 If any file of the chosen set exists, nothing is written unless --force is given. Files are
 written to *.tmp.blend first and then moved into place, so a failed run never leaves a
 truncated asset.
@@ -70,6 +74,11 @@ OUTPUTS = (CHARACTER_FILE, ACTIONS_FILE, PROP_FILE)
 OCHRE_FILE = Path("characters/mannequin_ochre.blend")
 GESTURES_FILE = Path("actions/mannequin_gestures.blend")
 M7_OUTPUTS = (OCHRE_FILE, GESTURES_FILE)
+# Milestone 11 set (--set m11): both characters with head marker A, as new assets under their
+# own names. The m6 and m7 sets are unchanged.
+MARKED_FILE = Path("characters/mannequin_marked.blend")
+OCHRE_MARKED_FILE = Path("characters/mannequin_ochre_marked.blend")
+M11_OUTPUTS = (MARKED_FILE, OCHRE_MARKED_FILE)
 
 CHARACTER_COLLECTION, ARMATURE, BODY = "CH-mannequin", "RIG-mannequin", "GEO-mannequin"
 PROP_COLLECTION, PROP_OBJECT = "PR-mannequin_baton", "GEO-mannequin_baton"
@@ -77,11 +86,22 @@ MATERIALS = {"body": ("MAT-mannequin_body", (0.62, 0.60, 0.56)),
              "accent": ("MAT-mannequin_accent", (0.12, 0.28, 0.55)),
              "baton": ("MAT-mannequin_baton", (0.30, 0.18, 0.09)),
              "ochre_body": ("MAT-mannequin_ochre_body", (0.60, 0.30, 0.05)),
-             "ochre_accent": ("MAT-mannequin_ochre_accent", (0.25, 0.07, 0.03))}
+             "ochre_accent": ("MAT-mannequin_ochre_accent", (0.25, 0.07, 0.03)),
+             "marker": ("MAT-mannequin_marker", (0.03, 0.03, 0.035)),
+             "ochre_marker": ("MAT-mannequin_ochre_marker", (0.03, 0.03, 0.035))}
+ROUGHNESS, MARKER_ROUGHNESS = 0.6, 0.35            # every material is 0.6 except the markers
+MATERIAL_ROUGHNESS = {"marker": MARKER_ROUGHNESS, "ochre_marker": MARKER_ROUGHNESS}
 # The ochre variant: the same skeleton, body parts and rig type under its own names, so both
 # characters can share a scene and every afs_mannequin_v1 action plays on either.
 OCHRE = {"collection": "CH-mannequin_ochre", "armature": "RIG-mannequin_ochre",
          "body": "GEO-mannequin_ochre", "materials": ("ochre_body", "ochre_accent")}
+# The marked variants (Milestone 11): the same characters with head marker A, under their own
+# names; material slot 2 is the marker.
+MARKED = {"collection": "CH-mannequin_marked", "armature": "RIG-mannequin_marked",
+          "body": "GEO-mannequin_marked", "materials": ("body", "accent", "marker")}
+OCHRE_MARKED = {"collection": "CH-mannequin_ochre_marked", "armature": "RIG-mannequin_ochre_marked",
+                "body": "GEO-mannequin_ochre_marked",
+                "materials": ("ochre_body", "ochre_accent", "ochre_marker")}
 
 # ---------------------------------------------------------------------------
 # Skeleton: name -> (parent, head, tail, connected). Metres, facing -Y.
@@ -134,6 +154,15 @@ PARTS = {
         ("hand", ("cyl", (0.035,), "accent")), ("thigh", ("cyl", (0.070,), "body")),
         ("shin", ("cyl", (0.055,), "body")), ("foot", ("cyl", (0.045,), "accent")))},
 }
+# Head marker A (adopted in Milestone 11; docs/m11_readable_attention.md): part -> (box centre,
+# box size (x, y, z), material role), in the rest frame (metres, facing -Y), all rigidly
+# weighted to the head bone. The visor is the marker material; the nose is the body material.
+MARKER_A = {
+    "visor": ((0.0, -0.085, 1.67), (0.13, 0.05, 0.035), "marker"),
+    "nose": ((0.0, -0.115, 1.625), (0.035, 0.05, 0.04), "body"),
+}
+MARKER_BONE = "head"
+MATERIAL_SLOT = {"body": 0, "accent": 1, "marker": 2}
 
 # ---------------------------------------------------------------------------
 # Actions
@@ -716,9 +745,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--out-root", required=True, type=Path,
                    help="directory to write characters/, actions/ and props/ into")
     p.add_argument("--force", action="store_true", help="overwrite existing output files")
-    p.add_argument("--set", choices=("m6", "m7"), default="m6",
+    p.add_argument("--set", choices=("m6", "m7", "m11"), default="m6",
                    help="m6: character, walk/idle actions, baton (default); "
-                        "m7: ochre character variant and gesture actions")
+                        "m7: ochre character variant and gesture actions; "
+                        "m11: both characters with head marker A")
     return p.parse_args(argv)
 
 
@@ -733,7 +763,7 @@ def _material(bpy, key: str):
     if bsdf is None:
         raise RuntimeError(f"{name}: no Principled BSDF node")
     bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
-    bsdf.inputs["Roughness"].default_value = 0.6
+    bsdf.inputs["Roughness"].default_value = MATERIAL_ROUGHNESS.get(key, ROUGHNESS)
     return mat
 
 
@@ -750,7 +780,8 @@ def _part_matrix(shape: str, dims, head, tail):
     return Matrix.Translation(mid) @ rot
 
 
-def _build_character(bpy, coll, armature=ARMATURE, body_name=BODY, materials=("body", "accent")):
+def _build_character(bpy, coll, armature=ARMATURE, body_name=BODY, materials=("body", "accent"),
+                     marker: bool = False):
     import bmesh
 
     arm_data = bpy.data.armatures.new(armature)
@@ -801,6 +832,16 @@ def _build_character(bpy, coll, armature=ARMATURE, body_name=BODY, materials=("b
             v[deform][groups[bone]] = 1.0
             for f in v.link_faces:
                 f.material_index = index
+    if marker:                                  # head marker A: two boxes on the head bone
+        from mathutils import Matrix
+        for centre, dims, role in MARKER_A.values():
+            verts = bmesh.ops.create_cube(bm, size=1.0)["verts"]
+            bmesh.ops.transform(bm, matrix=Matrix.Translation(centre) @ Matrix.Diagonal((*dims, 1.0)),
+                                verts=verts)
+            for v in verts:
+                v[deform][groups[MARKER_BONE]] = 1.0
+                for f in v.link_faces:
+                    f.material_index = MATERIAL_SLOT[role]
     bm.to_mesh(mesh)
     bm.free()
     return rig
@@ -879,7 +920,7 @@ def _write(bpy, root: Path, rel: Path, datablocks: set) -> tuple[Path, Path]:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     root = args.out_root.resolve()
-    outputs = OUTPUTS if args.set == "m6" else M7_OUTPUTS
+    outputs = {"m6": OUTPUTS, "m7": M7_OUTPUTS, "m11": M11_OUTPUTS}[args.set]
     existing = [str(root / rel) for rel in outputs if (root / rel).exists()]
     if existing and not args.force:
         print(f"[mannequin] REFUSED: output exists (pass --force to overwrite): {existing}",
@@ -891,6 +932,8 @@ def main(argv: list[str]) -> int:
     bpy.ops.wm.read_factory_settings(use_empty=True)
     if args.set == "m7":
         return _main_m7(bpy, root)
+    if args.set == "m11":
+        return _main_m11(bpy, root)
     scene = bpy.context.scene
     char_coll = bpy.data.collections.new(CHARACTER_COLLECTION)
     prop_coll = bpy.data.collections.new(PROP_COLLECTION)
@@ -935,6 +978,26 @@ def _main_m7(bpy, root: Path) -> int:
     try:
         written.append(_write(bpy, root, OCHRE_FILE, {ochre_coll}))
         written.append(_write(bpy, root, GESTURES_FILE, set(acts)))
+        for tmp, final in written:
+            os.replace(tmp, final)
+    finally:
+        for tmp, _ in written:
+            if tmp.exists():
+                tmp.unlink()
+    _report(written)
+    return 0
+
+
+def _main_m11(bpy, root: Path) -> int:
+    """Both characters with head marker A, each in its own file under its own names."""
+    scene = bpy.context.scene
+    written = []
+    try:
+        for spec, rel in ((MARKED, MARKED_FILE), (OCHRE_MARKED, OCHRE_MARKED_FILE)):
+            coll = bpy.data.collections.new(spec["collection"])
+            scene.collection.children.link(coll)
+            _build_character(bpy, coll, spec["armature"], spec["body"], spec["materials"], marker=True)
+            written.append(_write(bpy, root, rel, {coll}))
         for tmp, final in written:
             os.replace(tmp, final)
     finally:
